@@ -4,7 +4,7 @@ import healthRoutes from './health.routes';
 import uploadRoutes from './upload.routes';
 import webhookRoutes from './webhook.routes';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * Public routes (no auth required)

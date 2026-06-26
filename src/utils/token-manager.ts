@@ -1,14 +1,13 @@
-import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+import { google, Auth } from 'googleapis';
 import logger from './logger';
 
-let oauth2Client: OAuth2Client | null = null;
+let oauth2Client: Auth.OAuth2Client | null = null;
 let tokenExpiryTime: number | null = null;
 
 /**
  * Creates and returns a configured OAuth2 client with auto-refresh capability.
  */
-export function getOAuth2Client(): OAuth2Client {
+export function getOAuth2Client(): Auth.OAuth2Client {
   if (!oauth2Client) {
     oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -16,12 +15,12 @@ export function getOAuth2Client(): OAuth2Client {
       'urn:ietf:wg:oauth:2.0:oob',
     );
 
-    oauth2Client.setCredentials({
+    oauth2Client!.setCredentials({
       refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
     });
 
     // Listen for token refresh events
-    oauth2Client.on('tokens', (tokens) => {
+    oauth2Client!.on('tokens', (tokens: Auth.Credentials) => {
       if (tokens.expiry_date) {
         tokenExpiryTime = tokens.expiry_date;
         logger.info('Google OAuth token refreshed', {
@@ -31,7 +30,7 @@ export function getOAuth2Client(): OAuth2Client {
     });
   }
 
-  return oauth2Client;
+  return oauth2Client!;
 }
 
 /**

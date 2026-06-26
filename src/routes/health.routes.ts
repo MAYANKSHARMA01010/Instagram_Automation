@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { healthCheck, queueStats } from '../controllers/health.controller';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * @route  GET /health

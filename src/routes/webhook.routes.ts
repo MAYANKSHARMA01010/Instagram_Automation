@@ -6,7 +6,7 @@ import {
 } from '../controllers/webhook.controller';
 import { validateBody, sanitizeBody } from '../middlewares/validate.middleware';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * @route  POST /api/webhook/n8n/upload

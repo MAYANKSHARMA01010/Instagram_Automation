@@ -10,7 +10,7 @@ import {
 } from '../controllers/upload.controller';
 import { validateBody, sanitizeBody } from '../middlewares/validate.middleware';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * @route  POST /api/upload/trigger
