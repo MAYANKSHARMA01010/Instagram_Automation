@@ -89,14 +89,21 @@ export class InstagramService {
           params['cover_url'] = coverUrl;
         }
 
-        const response = await this.client.post<InstagramContainerCreateResponse>(
-          `/${accountId}/media`,
-          null,
-          { params },
-        );
+        try {
+          const response = await this.client.post<InstagramContainerCreateResponse>(
+            `/${accountId}/media`,
+            null,
+            { params },
+          );
 
-        logger.info('Reel container created', { containerId: response.data.id });
-        return response.data;
+          logger.info('Reel container created', { containerId: response.data.id });
+          return response.data;
+        } catch (error: any) {
+          if (error.response?.data?.error?.message) {
+            error.message = `${error.message} - Meta API Error: ${error.response.data.error.message}`;
+          }
+          throw error;
+        }
       },
       {
         maxAttempts: this.config.upload.maxRetryAttempts,
@@ -171,20 +178,27 @@ export class InstagramService {
 
     return withRetry(
       async () => {
-        const response = await this.client.post<InstagramPublishResponse>(
-          `/${accountId}/media_publish`,
-          null,
-          {
-            params: { creation_id: containerId },
-          },
-        );
+        try {
+          const response = await this.client.post<InstagramPublishResponse>(
+            `/${accountId}/media_publish`,
+            null,
+            {
+              params: { creation_id: containerId },
+            },
+          );
 
-        logger.info('Reel published successfully', {
-          mediaId: response.data.id,
-          containerId,
-        });
+          logger.info('Reel published successfully', {
+            mediaId: response.data.id,
+            containerId,
+          });
 
-        return response.data;
+          return response.data;
+        } catch (error: any) {
+          if (error.response?.data?.error?.message) {
+            error.message = `${error.message} - Meta API Error: ${error.response.data.error.message}`;
+          }
+          throw error;
+        }
       },
       {
         maxAttempts: this.config.upload.maxRetryAttempts,
