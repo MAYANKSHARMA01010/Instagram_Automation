@@ -1,0 +1,326 @@
+{
+  "name": "Instagram Reels Auto Uploader (Sequential)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "node-cron-trigger",
+      "name": "Cron Trigger — Every 10 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [180, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://app:3000/api/upload/trigger",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_KEY}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "node-trigger-poll",
+      "name": "HTTP — Trigger Drive Poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.data.queueStats.pending}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "node-check-has-jobs",
+      "name": "Check — Jobs In Queue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No new videos found — log and stop this execution\nreturn [{\n  json: {\n    message: 'No new video files found. Waiting for next poll cycle.',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-no-jobs",
+      "name": "Log — No Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 440]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "node-wait-initial",
+      "name": "Wait — 30s Initial Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [840, 200],
+      "webhookId": "wait-initial-poll"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://app:3000/health/queue",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_KEY}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "node-check-queue-status",
+      "name": "HTTP — Poll Queue Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.data.processing}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "node-check-still-processing",
+      "name": "Check — Still Processing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1280, 200]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "node-wait-processing",
+      "name": "Wait — 30s (Still Uploading)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1500, 100],
+      "webhookId": "wait-processing-poll"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.data.pending}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "node-check-more-pending",
+      "name": "Check — More Videos Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1500, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// All videos have been processed in this batch\nconst stats = $input.item.json.data;\nreturn [{\n  json: {\n    message: 'Batch complete — all videos processed',\n    completed: stats.completed,\n    failed: stats.failed,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-batch-done",
+      "name": "Log — Batch Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 440]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "minutes"
+      },
+      "id": "node-wait-between-uploads",
+      "name": "Wait — 2 Minutes Between Uploads",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1720, 200],
+      "webhookId": "wait-2-minutes-between"
+    }
+  ],
+  "connections": {
+    "Cron Trigger — Every 10 Minutes": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Trigger Drive Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Trigger Drive Poll": {
+      "main": [
+        [
+          {
+            "node": "Check — Jobs In Queue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check — Jobs In Queue?": {
+      "main": [
+        [
+          {
+            "node": "Wait — 30s Initial Processing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log — No Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 30s Initial Processing": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Poll Queue Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Poll Queue Status": {
+      "main": [
+        [
+          {
+            "node": "Check — Still Processing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check — Still Processing?": {
+      "main": [
+        [
+          {
+            "node": "Wait — 30s (Still Uploading)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check — More Videos Pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 30s (Still Uploading)": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Poll Queue Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check — More Videos Pending?": {
+      "main": [
+        [
+          {
+            "node": "Wait — 2 Minutes Between Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log — Batch Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 2 Minutes Between Uploads": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Poll Queue Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "UTC"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "id": "tag-instagram-automation",
+      "name": "instagram-automation"
+    }
+  ],
+  "triggerCount": 1,
+  "versionId": "v2.0.0",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
+}
