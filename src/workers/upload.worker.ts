@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { UploadJob } from '../types/upload.types';
 import { UploadJobModel, UploadLogModel, ProcessedFileModel } from '../database/repository';
 import { getDriveService } from '../services/google-drive.service';
@@ -82,9 +83,32 @@ export class UploadWorker {
       // ── Step 3: Construct Public URL for Instagram servers ────────────────────
       await UploadJobModel.update(job.id, { status: 'UPLOADING' });
 
+      const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
+      const account = this.config.accounts.find((a) => a.instagramAccountId === accountId);
+      const sourceFolderId = account?.driveFolderId ?? this.config.google.driveFolderId;
+
       const instagramService = getInstagramService();
       const captionService = getCaptionService();
-      const caption = captionService.getCaption();
+      let caption = captionService.getCaption();
+
+      try {
+        const captionFile = await driveService.findCaptionFile(sourceFolderId);
+        if (captionFile) {
+          const downloadResult = await driveService.downloadFile(captionFile.id, captionFile.name);
+          const downloadedText = fs.readFileSync(downloadResult.filePath, 'utf-8').trim();
+          if (downloadedText) {
+            caption = downloadedText;
+            logger.info('Using dynamic caption from Google Drive', { sourceFolderId, length: caption.length });
+          }
+          // Clean up the temp caption file
+          fs.unlinkSync(downloadResult.filePath);
+        }
+      } catch (captionErr) {
+        logger.warn('Could not download dynamic caption file — proceeding with fallback', {
+          sourceFolderId,
+          error: captionErr instanceof Error ? captionErr.message : String(captionErr),
+        });
+      }
 
       // Instagram Graph API requires a publicly accessible URL for Reels.
       // We serve the downloaded tmp file via the /public/tmp route.
@@ -96,10 +120,6 @@ export class UploadWorker {
 
       // ── Step 4: Create Instagram Reel container ─────────────────────────────
       await UploadJobModel.update(job.id, { status: 'PROCESSING' });
-
-      const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
-      const account = this.config.accounts.find((a) => a.instagramAccountId === accountId);
-      const sourceFolderId = account?.driveFolderId ?? this.config.google.driveFolderId;
 
       let coverUrl: string | undefined;
 

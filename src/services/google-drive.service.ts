@@ -104,6 +104,39 @@ export class GoogleDriveService {
   }
 
   /**
+   * Finds a caption file (caption.txt) in the specified folder.
+   */
+  async findCaptionFile(folderId: string): Promise<DriveFile | null> {
+    return withRetry(
+      async () => {
+        logger.info('Searching for caption.txt in Drive folder', { folderId });
+        const response: any = await this.drive.files.list({
+          q: `'${folderId}' in parents and name = 'caption.txt' and trashed = false`,
+          fields: 'files(id, name, mimeType, size, createdTime, modifiedTime)',
+          pageSize: 1,
+        });
+
+        const files = response.data.files ?? [];
+        if (files.length === 0) return null;
+
+        const f = files[0];
+        return {
+          id: f.id ?? '',
+          name: f.name ?? '',
+          mimeType: f.mimeType ?? '',
+          size: f.size ?? '0',
+          createdTime: f.createdTime ?? '',
+          modifiedTime: f.modifiedTime ?? '',
+        };
+      },
+      {
+        maxAttempts: this.config.upload.maxRetryAttempts,
+        baseDelayMs: this.config.upload.retryBaseDelayMs,
+      }
+    );
+  }
+
+  /**
    * Downloads a file from Google Drive to a local temporary path.
    * Uses streaming to support large files without loading into memory.
    */
