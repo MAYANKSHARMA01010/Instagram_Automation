@@ -3,10 +3,6 @@ dist/
 .env
 logs/*.log
 database/*.db
-public/*
-!public/cover/
-public/cover/*
-!public/cover/cover.jpg
 tmp/
 *.tmp
 .DS_Store
