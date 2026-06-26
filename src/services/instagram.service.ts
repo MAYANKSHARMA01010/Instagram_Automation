@@ -119,7 +119,7 @@ export class InstagramService {
   async getContainerStatus(containerId: string): Promise<InstagramContainerStatus> {
     const response = await this.client.get<InstagramContainerStatus>(`/${containerId}`, {
       params: {
-        fields: 'id,status,status_code,error_code,error_message',
+        fields: 'id,status_code',
       },
     });
 
