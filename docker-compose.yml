@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # ─── Instagram Reels Uploader Backend ───────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: instagram-reels-uploader:latest
+    container_name: instagram_reels_uploader
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      SQLITE_PATH: /app/data/uploads.db
+      LOG_DIR: /app/logs
+    volumes:
+      # Persist database between restarts
+      - app_database:/app/data
+      # Persist logs
+      - app_logs:/app/logs
+      # Mount caption.txt for easy editing without rebuild
+      - ./caption.txt:/app/caption.txt:ro
+      # Mount cover image directory
+      - ./public/cover:/app/public/cover:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - reels_network
+    depends_on:
+      - n8n
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─── n8n Automation ──────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: instagram_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://app:3000
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Auto-import workflow on startup
+      - ./n8n:/home/node/.n8n/workflows:ro
+    networks:
+      - reels_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  app_database:
+    driver: local
+  app_logs:
+    driver: local
+  n8n_data:
+    driver: local
+
+networks:
+  reels_network:
+    driver: bridge
