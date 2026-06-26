@@ -76,12 +76,7 @@ const staticErrorTransport = new winston.transports.File({
   options: { flags: 'a' },
 });
 
-const transports: winston.transport[] = [
-  appFileTransport,
-  errorFileTransport,
-  staticAppTransport,
-  staticErrorTransport,
-];
+const transports: winston.transport[] = [];
 
 // Add console transport in non-production environments
 if (process.env.NODE_ENV !== 'production') {
