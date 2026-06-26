@@ -69,7 +69,7 @@ export function loadConfig(): Config {
     upload: {
       maxFileSizeBytes: parseInt(process.env.MAX_FILE_SIZE_BYTES ?? '1073741824', 10),
       maxDurationSeconds: parseInt(process.env.MAX_DURATION_SECONDS ?? '900', 10),
-      pollingCron: process.env.POLLING_CRON ?? '*/10 * * * *',
+      pollingCron: process.env.POLLING_CRON ?? '*/5 * * * *',
       maxRetryAttempts: parseInt(process.env.MAX_RETRY_ATTEMPTS ?? '3', 10),
       retryBaseDelayMs: parseInt(process.env.RETRY_BASE_DELAY_MS ?? '5000', 10),
       statusPollIntervalMs: parseInt(process.env.STATUS_POLL_INTERVAL_MS ?? '15000', 10),
