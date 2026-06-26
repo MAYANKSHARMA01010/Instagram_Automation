@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+logs/*.log
+database/*.db
+public/
+tmp/
+*.tmp
+.DS_Store
+coverage/
