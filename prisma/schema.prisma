@@ -1,0 +1,59 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model UploadLog {
+  id                 String   @id
+  driveFileId        String   @map("drive_file_id")
+  driveFileName      String   @map("drive_file_name")
+  status             String   @default("PENDING")
+  instagramMediaId   String?  @map("instagram_media_id")
+  errorMessage       String?  @map("error_message")
+  durationMs         Int      @default(0) @map("duration_ms")
+  queueStartTime     DateTime @default(now()) @map("queue_start_time")
+  uploadStartTime    DateTime @default(now()) @map("upload_start_time")
+  uploadEndTime      DateTime @default(now()) @map("upload_end_time")
+  retryCount         Int      @default(0) @map("retry_count")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([driveFileId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("upload_logs")
+}
+
+model ProcessedFile {
+  id                 String   @id
+  driveFileId        String   @unique @map("drive_file_id")
+  driveFileName      String   @map("drive_file_name")
+  instagramMediaId   String?  @map("instagram_media_id")
+  processedAt        DateTime @default(now()) @map("processed_at")
+
+  @@index([driveFileId])
+  @@map("processed_files")
+}
+
+model UploadJob {
+  id                   String   @id
+  driveFileId          String   @map("drive_file_id")
+  driveFileName        String   @map("drive_file_name")
+  localFilePath        String?  @map("local_file_path")
+  status               String   @default("PENDING")
+  retryCount           Int      @default(0) @map("retry_count")
+  instagramContainerId String?  @map("instagram_container_id")
+  instagramMediaId     String?  @map("instagram_media_id")
+  errorMessage         String?  @map("error_message")
+  errorStack           String?  @map("error_stack")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([driveFileId])
+  @@map("upload_jobs")
+}
