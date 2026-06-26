@@ -25,6 +25,8 @@ export interface UploadJob {
   instagramMediaId?: string;
   errorMessage?: string;
   errorStack?: string;
+  instagramAccountId?: string;
+  uploadedDriveFolderId?: string;
 }
 
 export interface UploadLog {
@@ -40,6 +42,8 @@ export interface UploadLog {
   uploadEndTime: string; // ISO — when processing finished
   retryCount: number;
   createdAt: Date;
+  instagramAccountId?: string;
+  uploadedDriveFolderId?: string;
 }
 
 export interface ProcessedFile {

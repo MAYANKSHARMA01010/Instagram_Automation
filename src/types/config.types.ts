@@ -56,6 +56,12 @@ export interface LogConfig {
   dir: string;
 }
 
+export interface AccountMapping {
+  instagramAccountId: string;
+  driveFolderId: string;
+  driveUploadedFolderId: string;
+}
+
 export interface Config {
   app: AppConfig;
   google: GoogleConfig;
@@ -65,4 +71,5 @@ export interface Config {
   database: DatabaseConfig;
   telegram: TelegramConfig;
   log: LogConfig;
+  accounts: AccountMapping[];
 }

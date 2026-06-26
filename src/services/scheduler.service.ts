@@ -3,7 +3,7 @@ import { getConfig } from '../config';
 import logger from '../utils/logger';
 import { getUploadQueue } from '../queue/upload.queue';
 import { getDriveService } from './google-drive.service';
-import { ProcessedFileModel, UploadJobModel } from '../database/repository';
+import { ProcessedFileModel } from '../database/repository';
 
 /**
  * Scheduler service that periodically polls Google Drive for new videos
@@ -81,43 +81,70 @@ export class SchedulerService {
 
     try {
       const driveService = getDriveService();
-      const files = await driveService.listVideoFiles();
+      const accounts = this.config.accounts;
 
-      if (files.length === 0) {
-        logger.info('No new video files found in Drive folder');
-        return;
-      }
+      let totalEnqueued = 0;
+      let totalSkipped = 0;
 
-      const queue = getUploadQueue();
-      let enqueued = 0;
-      let skipped = 0;
+      for (const account of accounts) {
+        if (!account.driveFolderId) continue;
 
-      for (const file of files) {
-        // Skip already processed files
-        if (await ProcessedFileModel.isProcessed(file.id)) {
-          logger.debug('Skipping already processed file', { fileId: file.id, name: file.name });
-          skipped++;
+        const files = await driveService.listVideoFiles({ folderId: account.driveFolderId });
+
+        if (files.length === 0) {
+          logger.info('No new video files found in Drive folder', { folderId: account.driveFolderId });
           continue;
         }
 
-        // Skip files that already have a job record
-        if (await UploadJobModel.hasJob(file.id)) {
-          logger.debug('Skipping file with existing job', { fileId: file.id, name: file.name });
-          skipped++;
-          continue;
+        const queue = getUploadQueue();
+        let enqueued = 0;
+        let skipped = 0;
+
+        for (const file of files) {
+          // Skip already processed files
+          if (await ProcessedFileModel.isProcessed(file.id)) {
+            logger.debug('Skipping already processed file', { fileId: file.id, name: file.name });
+            skipped++;
+            continue;
+          }
+
+          // Check if queue has a pending/active job for this file
+          if (await queue.isProcessing(file.id)) {
+            logger.debug('File already in queue', { fileId: file.id, name: file.name });
+            skipped++;
+            continue;
+          }
+
+          // Attempt to enqueue with account mapping context
+          const job = await queue.enqueue(file, account.instagramAccountId, account.driveUploadedFolderId);
+          if (job) {
+            enqueued++;
+            logger.info('Enqueued file for upload', {
+              fileId: file.id,
+              name: file.name,
+              accountId: account.instagramAccountId
+            });
+          } else {
+            skipped++;
+          }
         }
 
-        // Enqueue the file
-        await queue.enqueue(file);
-        enqueued++;
-        logger.info('Enqueued file for upload', { fileId: file.id, name: file.name });
+        totalEnqueued += enqueued;
+        totalSkipped += skipped;
+
+        logger.info('Poll cycle complete for folder', {
+          folderId: account.driveFolderId,
+          total: files.length,
+          enqueued,
+          skipped,
+        });
       }
 
-      logger.info('Poll cycle complete', {
-        total: files.length,
-        enqueued,
-        skipped,
+      logger.info('Overall poll cycle complete', {
+        totalEnqueued,
+        totalSkipped,
       });
+
     } catch (error) {
       logger.error('Drive poll cycle failed', {
         error: error instanceof Error ? error.message : String(error),

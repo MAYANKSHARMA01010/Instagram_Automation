@@ -117,9 +117,11 @@ export class UploadWorker {
         }
       }
 
+      const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
+
       let container;
       try {
-        container = await instagramService.createReelContainer(videoUrl, caption, coverUrl);
+        container = await instagramService.createReelContainer(accountId, videoUrl, caption, coverUrl);
       } catch (containerErr) {
         // REQ-3: If container creation with cover fails, retry without cover
         if (
@@ -130,7 +132,7 @@ export class UploadWorker {
           logger.warn('Container creation with cover failed — retrying without cover', {
             error: containerErr.message,
           });
-          container = await instagramService.createReelContainer(videoUrl, caption, undefined);
+          container = await instagramService.createReelContainer(accountId, videoUrl, caption, undefined);
         } else {
           throw containerErr;
         }
@@ -152,7 +154,7 @@ export class UploadWorker {
       // ── Step 6: Publish the Reel ────────────────────────────────────────────
       await UploadJobModel.update(job.id, { status: 'PUBLISHING' });
 
-      const publishResult = await instagramService.publishReel(container.id);
+      const publishResult = await instagramService.publishReel(accountId, container.id);
       const instagramMediaId = publishResult.id;
 
       await UploadJobModel.update(job.id, { status: 'COMPLETED', instagramMediaId });
@@ -164,7 +166,8 @@ export class UploadWorker {
       });
 
       // ── Step 7: Move file to Uploaded folder in Drive ───────────────────────
-      await driveService.moveToUploaded(job.driveFileId, job.driveFileName);
+      const uploadedFolderId = job.uploadedDriveFolderId ?? this.config.google.driveUploadedFolderId;
+      await driveService.moveToUploaded(job.driveFileId, job.driveFileName, uploadedFolderId);
 
       // ── Step 8: Record in processed_files (prevents re-upload) ─────────────
       await ProcessedFileModel.markProcessed({
@@ -187,6 +190,8 @@ export class UploadWorker {
         uploadStartTime: uploadStartTime.toISOString(),
         uploadEndTime: uploadEndTime.toISOString(),
         retryCount: job.retryCount,
+        instagramAccountId: accountId,
+        uploadedDriveFolderId: uploadedFolderId,
       });
 
       // ── Step 10: Send success notification (REQ-6b) ─────────────────────────

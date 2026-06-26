@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { Config } from '../types/config.types';
+import { Config, AccountMapping } from '../types/config.types';
 
 // Load .env file
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -13,9 +13,6 @@ const REQUIRED_VARS: string[] = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'GOOGLE_REFRESH_TOKEN',
-  'GOOGLE_DRIVE_FOLDER_ID',
-  'GOOGLE_DRIVE_UPLOADED_FOLDER_ID',
-  'INSTAGRAM_ACCOUNT_ID',
   'GRAPH_API_TOKEN',
   'API_KEY',
   'PUBLIC_URL',
@@ -33,6 +30,36 @@ export function validateConfig(): void {
       `Missing required environment variables:\n${missing.map((k) => `  - ${k}`).join('\n')}\n\nSee .env.example for reference.`,
     );
   }
+
+  // Also check that either ACCOUNTS_CONFIG is set, or the legacy vars are set
+  if (!process.env.ACCOUNTS_CONFIG) {
+    const legacyVars = ['GOOGLE_DRIVE_FOLDER_ID', 'GOOGLE_DRIVE_UPLOADED_FOLDER_ID', 'INSTAGRAM_ACCOUNT_ID'];
+    const missingLegacy = legacyVars.filter((key) => !process.env[key]);
+    if (missingLegacy.length > 0) {
+      throw new Error(
+        `Missing required environment variables:\n  - ACCOUNTS_CONFIG\nOR legacy variables:\n${missingLegacy.map((k) => `  - ${k}`).join('\n')}`,
+      );
+    }
+  }
+}
+
+function parseAccountsConfig(): AccountMapping[] {
+  const accountsStr = process.env.ACCOUNTS_CONFIG;
+  if (accountsStr) {
+    try {
+      return JSON.parse(accountsStr);
+    } catch (e) {
+      console.error('Failed to parse ACCOUNTS_CONFIG env variable:', e);
+      // Fall through to legacy if parse fails
+    }
+  }
+  
+  // Fallback to legacy config
+  return [{
+    instagramAccountId: process.env.INSTAGRAM_ACCOUNT_ID ?? '',
+    driveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? '',
+    driveUploadedFolderId: process.env.GOOGLE_DRIVE_UPLOADED_FOLDER_ID ?? ''
+  }];
 }
 
 /**
@@ -88,6 +115,7 @@ export function loadConfig(): Config {
       level: process.env.LOG_LEVEL ?? 'info',
       dir: path.resolve(process.cwd(), process.env.LOG_DIR ?? './logs'),
     },
+    accounts: parseAccountsConfig(),
   };
 }
 

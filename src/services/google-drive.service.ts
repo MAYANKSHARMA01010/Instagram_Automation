@@ -145,8 +145,7 @@ export class GoogleDriveService {
    * Moves a file to the "Uploaded" folder by changing its parent.
    * This is the Google Drive equivalent of a file move operation.
    */
-  async moveToUploaded(fileId: string, fileName: string): Promise<void> {
-    const uploadedFolderId = this.config.google.driveUploadedFolderId;
+  async moveToUploaded(fileId: string, fileName: string, uploadedFolderId: string): Promise<void> {
 
     return withRetry(
       async () => {

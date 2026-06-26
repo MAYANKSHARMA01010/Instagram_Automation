@@ -1,6 +1,4 @@
 import winston from 'winston';
-import DailyRotateFile from 'winston-daily-rotate-file';
-import path from 'path';
 import fs from 'fs';
 
 const logDir = process.env.LOG_DIR ?? './logs';
@@ -32,49 +30,6 @@ const consoleFormat = winston.format.combine(
     return `[${String(timestamp)}] ${level}: ${String(message)}${metaStr}`;
   }),
 );
-
-/**
- * Rotating file transport for general application logs.
- */
-const appFileTransport = new DailyRotateFile({
-  filename: path.join(logDir, 'app-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  zippedArchive: true,
-  maxSize: '20m',
-  maxFiles: '14d',
-  format: logFormat,
-  level: logLevel,
-});
-
-/**
- * Rotating file transport for errors only.
- */
-const errorFileTransport = new DailyRotateFile({
-  filename: path.join(logDir, 'error-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  zippedArchive: true,
-  maxSize: '20m',
-  maxFiles: '30d',
-  format: logFormat,
-  level: 'error',
-});
-
-/**
- * Static symlink transports so logs/app.log always points to today's file.
- */
-const staticAppTransport = new winston.transports.File({
-  filename: path.join(logDir, 'app.log'),
-  format: logFormat,
-  level: logLevel,
-  options: { flags: 'a' },
-});
-
-const staticErrorTransport = new winston.transports.File({
-  filename: path.join(logDir, 'error.log'),
-  format: logFormat,
-  level: 'error',
-  options: { flags: 'a' },
-});
 
 const transports: winston.transport[] = [];
 

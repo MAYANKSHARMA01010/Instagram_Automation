@@ -15,7 +15,11 @@ export class UploadQueue extends EventEmitter {
    * Adds a Drive file to the upload queue.
    * Prevents duplicates via the processedFiles table and active job check.
    */
-  async enqueue(driveFile: DriveFile): Promise<UploadJob | null> {
+  async enqueue(
+    driveFile: DriveFile,
+    instagramAccountId: string,
+    uploadedDriveFolderId: string
+  ): Promise<UploadJob | null> {
     // Double-check for duplicates
     if (await ProcessedFileModel.isProcessed(driveFile.id)) {
       logger.debug('File already processed, not enqueuing', { fileId: driveFile.id });
@@ -31,6 +35,8 @@ export class UploadQueue extends EventEmitter {
       driveFileId: driveFile.id,
       driveFileName: driveFile.name,
       status: 'PENDING',
+      instagramAccountId,
+      uploadedDriveFolderId,
     });
 
     logger.info('Job added to queue', { jobId: job.id, fileName: driveFile.name });
@@ -42,11 +48,18 @@ export class UploadQueue extends EventEmitter {
   /**
    * Manually enqueues a job by Drive file ID (for API-triggered uploads).
    */
-  async enqueueById(driveFileId: string, driveFileName: string): Promise<UploadJob> {
+  async enqueueById(
+    driveFileId: string,
+    driveFileName: string,
+    instagramAccountId: string,
+    uploadedDriveFolderId: string
+  ): Promise<UploadJob> {
     const job = await UploadJobModel.create({
       driveFileId,
       driveFileName,
       status: 'PENDING',
+      instagramAccountId,
+      uploadedDriveFolderId,
     });
 
     logger.info('Job manually enqueued', { jobId: job.id, driveFileId, driveFileName });

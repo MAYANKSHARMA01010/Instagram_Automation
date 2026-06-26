@@ -3,6 +3,7 @@ import { getUploadQueue } from '../queue/upload.queue';
 import { getSchedulerService } from '../services/scheduler.service';
 import { getDriveService } from '../services/google-drive.service';
 import { UploadLogModel, UploadJobModel, ProcessedFileModel } from '../database/repository';
+import { getConfig } from '../config';
 import logger from '../utils/logger';
 
 /**
@@ -49,7 +50,13 @@ export async function enqueueFile(req: Request, res: Response): Promise<void> {
     const fileMetadata = await driveService.getFileMetadata(driveFileId);
 
     const queue = getUploadQueue();
-    const job = await queue.enqueueById(fileMetadata.id, fileMetadata.name);
+    const defaultAccount = getConfig().accounts[0];
+    const job = await queue.enqueueById(
+      fileMetadata.id,
+      fileMetadata.name,
+      defaultAccount.instagramAccountId,
+      defaultAccount.driveUploadedFolderId
+    );
 
     res.json({
       success: true,

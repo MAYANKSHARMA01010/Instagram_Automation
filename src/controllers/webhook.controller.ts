@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getUploadQueue } from '../queue/upload.queue';
 import { getInstagramService } from '../services/instagram.service';
 import { UploadJobModel } from '../database/repository';
+import { getConfig } from '../config';
 import logger from '../utils/logger';
 
 /**
@@ -23,7 +24,13 @@ export async function handleN8nUpload(req: Request, res: Response): Promise<void
 
   try {
     const queue = getUploadQueue();
-    const job = await queue.enqueueById(driveFileId, driveFileName);
+    const defaultAccount = getConfig().accounts[0];
+    const job = await queue.enqueueById(
+      driveFileId,
+      driveFileName,
+      defaultAccount.instagramAccountId,
+      defaultAccount.driveUploadedFolderId
+    );
 
     res.json({
       success: true,
@@ -113,8 +120,15 @@ export async function handleN8nPublish(req: Request, res: Response): Promise<voi
   logger.info('Received n8n publish webhook', { jobId, containerId });
 
   try {
+    const job = await UploadJobModel.findById(jobId);
+    if (!job) {
+      res.status(404).json({ success: false, error: 'Job not found' });
+      return;
+    }
+
     const instagramService = getInstagramService();
-    const publishResult = await instagramService.publishReel(containerId);
+    const accountId = job.instagramAccountId ?? getConfig().accounts[0].instagramAccountId;
+    const publishResult = await instagramService.publishReel(accountId, containerId);
 
     await UploadJobModel.update(jobId, {
       status: 'COMPLETED',

@@ -64,12 +64,11 @@ export class InstagramService {
    * @param coverUrl - Optional cover image URL
    */
   async createReelContainer(
+    accountId: string,
     videoUrl: string,
     caption: string,
     coverUrl?: string,
   ): Promise<InstagramContainerCreateResponse> {
-    const { accountId } = this.config.instagram;
-
     logger.info('Creating Instagram Reel container', {
       accountId,
       hasCaption: !!caption,
@@ -171,9 +170,7 @@ export class InstagramService {
   /**
    * Publishes a media container as an Instagram Reel.
    */
-  async publishReel(containerId: string): Promise<InstagramPublishResponse> {
-    const { accountId } = this.config.instagram;
-
+  async publishReel(accountId: string, containerId: string): Promise<InstagramPublishResponse> {
     logger.info('Publishing Instagram Reel', { accountId, containerId });
 
     return withRetry(
