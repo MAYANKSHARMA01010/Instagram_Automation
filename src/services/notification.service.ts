@@ -12,6 +12,7 @@ export interface StartedPayload {
   queuePosition: number; // 1-based position in current batch
   totalInQueue: number; // total pending when job started
   startTime: Date;
+  accountId?: string;
 }
 
 export interface SuccessPayload {
@@ -20,6 +21,7 @@ export interface SuccessPayload {
   uploadTimeMs: number;
   driveFileId: string;
   queueRemaining: number; // jobs still pending after this one
+  accountId?: string;
 }
 
 export interface FailurePayload {
@@ -29,6 +31,7 @@ export interface FailurePayload {
   driveFileId: string;
   httpStatus?: number; // HTTP status code if available
   retryCount: number; // how many attempts were made
+  accountId?: string;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -64,16 +67,20 @@ export class NotificationService {
     if (!this.isConfigured()) return;
 
     const startStr = payload.startTime.toUTCString();
+    
+    let header = '▶️ *Upload Started*';
+    const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
+    if (account?.accountName) header += ` [${this.esc(account.accountName)}]`;
 
     const message = [
-      '▶️ *Upload Started*',
+      header,
       '',
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `🔢 *Queue Position:* ${payload.queuePosition} of ${payload.totalInQueue}`,
       `🕐 *Start Time:* ${startStr}`,
     ].join('\n');
 
-    await this.sendMessage(message);
+    await this.sendMessage(message, account?.telegramThreadId);
   }
 
   // ─── REQ-6b: Upload Success ──────────────────────────────────────────────
@@ -90,8 +97,12 @@ export class NotificationService {
     const uploadSeconds = Math.round(payload.uploadTimeMs / 1000);
     const totalToday = await UploadLogModel.countTodaySuccess();
 
+    let header = '✅ *Reel Uploaded Successfully*';
+    const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
+    if (account?.accountName) header += ` [${this.esc(account.accountName)}]`;
+
     const message = [
-      '✅ *Reel Uploaded Successfully*',
+      header,
       '',
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `⏱ *Upload Time:* ${uploadSeconds}s`,
@@ -102,7 +113,7 @@ export class NotificationService {
       `🕐 *Completed:* ${new Date().toUTCString()}`,
     ].join('\n');
 
-    await this.sendMessage(message);
+    await this.sendMessage(message, account?.telegramThreadId);
   }
 
   // ─── REQ-6c: Upload Failed ───────────────────────────────────────────────
@@ -119,8 +130,12 @@ export class NotificationService {
     const stackPreview = payload.stack ? truncate(payload.stack, 300) : 'N/A';
     const httpLine = payload.httpStatus ? `\n🌐 *HTTP Status:* ${payload.httpStatus}` : '';
 
+    let header = '❌ *Reel Upload Failed*';
+    const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
+    if (account?.accountName) header += ` [${this.esc(account.accountName)}]`;
+
     const message = [
-      '❌ *Reel Upload Failed*',
+      header,
       '',
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
@@ -130,7 +145,7 @@ export class NotificationService {
       `🕐 *Time:* ${new Date().toUTCString()}`,
     ].join('\n');
 
-    await this.sendMessage(message);
+    await this.sendMessage(message, account?.telegramThreadId);
   }
 
   // ─── REQ-6d: Batch Finished ──────────────────────────────────────────────
@@ -180,18 +195,20 @@ export class NotificationService {
 
   /**
    * Sends a raw message to the configured Telegram chat (MarkdownV2 parse mode).
+   * Optionally sends to a specific thread/topic.
    * Never throws — always catches and logs errors.
    */
-  private async sendMessage(text: string): Promise<void> {
+  private async sendMessage(text: string, threadId?: string): Promise<void> {
     try {
       await axios.post(`${this.baseUrl}/sendMessage`, {
         chat_id: this.config.telegram.chatId,
+        message_thread_id: threadId,
         text,
         parse_mode: 'Markdown',
         disable_web_page_preview: true,
       });
 
-      logger.debug('Telegram notification sent');
+      logger.debug('Telegram notification sent', { threadId });
     } catch (error) {
       // Notification failures must never crash the upload pipeline
       logger.error('Failed to send Telegram notification', {

@@ -150,6 +150,7 @@ export class DownloadWorker {
           queuePosition: batchTotalFound,
           totalInQueue: batchTotalFound + pendingBefore,
           startTime: new Date(),
+          accountId: currentJob.instagramAccountId ?? undefined,
         });
 
         // ── Process the job ─────────────────────────────────────────────────

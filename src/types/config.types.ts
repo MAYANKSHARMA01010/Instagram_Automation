@@ -60,6 +60,8 @@ export interface AccountMapping {
   instagramAccountId: string;
   driveFolderId: string;
   driveUploadedFolderId: string;
+  accountName?: string;
+  telegramThreadId?: string;
 }
 
 export interface Config {

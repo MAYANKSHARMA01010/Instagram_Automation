@@ -203,6 +203,7 @@ export class UploadWorker {
         uploadTimeMs: durationMs,
         driveFileId: job.driveFileId,
         queueRemaining,
+        accountId,
       });
 
       logger.info('Upload pipeline completed successfully', {
@@ -290,6 +291,7 @@ export class UploadWorker {
       driveFileId: job.driveFileId,
       httpStatus,
       retryCount: job.retryCount,
+      accountId: job.instagramAccountId ?? undefined,
     });
   }
 
