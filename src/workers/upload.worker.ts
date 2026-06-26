@@ -97,27 +97,47 @@ export class UploadWorker {
       // ── Step 4: Create Instagram Reel container ─────────────────────────────
       await UploadJobModel.update(job.id, { status: 'PROCESSING' });
 
-      // REQ-3: Attempt to use the configured cover image.
-      // If the API does not accept it, log a warning and continue without it.
+      const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
+      const account = this.config.accounts.find((a) => a.instagramAccountId === accountId);
+      const sourceFolderId = account?.driveFolderId ?? this.config.google.driveFolderId;
+
       let coverUrl: string | undefined;
-      const coverImagePath = this.config.content.coverImage;
-      if (coverImagePath) {
-        try {
-          // Cover must be a publicly accessible URL for the Graph API.
-          // For self-hosted deployments, serve it from the /public endpoint.
+
+      try {
+        const coverFile = await driveService.findCoverImage(sourceFolderId);
+        if (coverFile) {
+          const downloadResult = await driveService.downloadFile(coverFile.id, coverFile.name);
           const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
-          coverUrl = `${host}/public/cover/${coverImagePath.split('/').pop() ?? 'cover.jpg'}`;
-          logger.debug('Using cover image URL', { coverUrl });
-        } catch (coverErr) {
-          logger.warn('Could not construct cover image URL — uploading without cover', {
-            coverImagePath,
-            error: coverErr instanceof Error ? coverErr.message : String(coverErr),
-          });
-          coverUrl = undefined;
+          const coverFileName = downloadResult.filePath.split('/').pop();
+          coverUrl = `${host}/public/tmp/${coverFileName}`;
+          logger.info('Using dynamic cover image from Google Drive', { coverUrl, sourceFolderId });
         }
+      } catch (coverErr) {
+        logger.warn('Could not download dynamic cover image — proceeding without or with fallback', {
+          sourceFolderId,
+          error: coverErr instanceof Error ? coverErr.message : String(coverErr),
+        });
       }
 
-      const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
+      // Fallback to static cover image if drive folder doesn't have one
+      if (!coverUrl) {
+        const coverImagePath = this.config.content.coverImage;
+        if (coverImagePath) {
+          try {
+            // Cover must be a publicly accessible URL for the Graph API.
+            // For self-hosted deployments, serve it from the /public endpoint.
+            const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
+            coverUrl = `${host}/public/cover/${coverImagePath.split('/').pop() ?? 'cover.jpg'}`;
+            logger.debug('Using local fallback cover image URL', { coverUrl });
+          } catch (coverErr) {
+            logger.warn('Could not construct local cover image URL — uploading without cover', {
+              coverImagePath,
+              error: coverErr instanceof Error ? coverErr.message : String(coverErr),
+            });
+            coverUrl = undefined;
+          }
+        }
+      }
 
       let container;
       try {
