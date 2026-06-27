@@ -70,11 +70,11 @@ export class NotificationService {
     
     let header = '▶️ *Upload Started*';
     const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
-    if (account?.accountName) header += ` [${this.esc(account.accountName)}]`;
 
     const message = [
       header,
       '',
+      `👤 *Account:* ${account?.accountName ? this.esc(account.accountName) : 'Unknown'}`,
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `🔢 *Queue Position:* ${payload.queuePosition} of ${payload.totalInQueue}`,
       `🕐 *Start Time:* ${startStr}`,
@@ -96,20 +96,22 @@ export class NotificationService {
 
     const uploadSeconds = Math.round(payload.uploadTimeMs / 1000);
     const totalToday = await UploadLogModel.countTodaySuccess();
+    const startTime = new Date(Date.now() - payload.uploadTimeMs).toUTCString();
 
     let header = '✅ *Reel Uploaded Successfully*';
     const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
-    if (account?.accountName) header += ` [${this.esc(account.accountName)}]`;
 
     const message = [
       header,
       '',
+      `👤 *Account:* ${account?.accountName ? this.esc(account.accountName) : 'Unknown'}`,
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `⏱ *Upload Time:* ${uploadSeconds}s`,
       `🆔 *Instagram Media ID:* \`${payload.instagramMediaId}\``,
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
       `🔜 *Queue Remaining:* ${payload.queueRemaining} video(s)`,
       `📊 *Total Uploaded Today:* ${totalToday}`,
+      `🕐 *Started:* ${startTime}`,
       `🕐 *Completed:* ${new Date().toUTCString()}`,
     ].join('\n');
 
@@ -132,17 +134,17 @@ export class NotificationService {
 
     let header = '❌ *Reel Upload Failed*';
     const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
-    if (account?.accountName) header += ` [${this.esc(account.accountName)}]`;
 
     const message = [
       header,
       '',
+      `👤 *Account:* ${account?.accountName ? this.esc(account.accountName) : 'Unknown'}`,
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
       `💬 *Error:* ${this.esc(payload.reason)}${httpLine}`,
       `🔁 *Retry Count:* ${payload.retryCount}`,
       `🔍 *Stack:*\n\`\`\`\n${this.esc(stackPreview)}\n\`\`\``,
-      `🕐 *Time:* ${new Date().toUTCString()}`,
+      `🕐 *Failed At:* ${new Date().toUTCString()}`,
     ].join('\n');
 
     await this.sendMessage(message, account?.telegramThreadId);

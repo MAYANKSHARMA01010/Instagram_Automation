@@ -124,10 +124,20 @@ export class UploadQueue extends EventEmitter {
    */
   async dequeueNext(): Promise<UploadJob | null> {
     const pendingJobs = await UploadJobModel.findByStatus('PENDING');
-    const nextJob = pendingJobs.find((j) => !this.processingSet.has(j.id));
+    const availableJobs = pendingJobs.filter((j) => !this.processingSet.has(j.id));
 
-    if (!nextJob) return null;
+    if (availableJobs.length === 0) return null;
 
+    // Group jobs by account so they don't interleave
+    availableJobs.sort((a, b) => {
+      const accountA = a.instagramAccountId || '';
+      const accountB = b.instagramAccountId || '';
+      const accountCompare = accountA.localeCompare(accountB);
+      if (accountCompare !== 0) return accountCompare;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+
+    const nextJob = availableJobs[0];
     this.processingSet.add(nextJob.id);
     return nextJob;
   }
