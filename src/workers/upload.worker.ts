@@ -5,6 +5,7 @@ import { getDriveService } from '../services/google-drive.service';
 import { getInstagramService } from '../services/instagram.service';
 import { getCaptionService } from '../services/caption.service';
 import { getNotificationService } from '../services/notification.service';
+import { getStatisticsService } from '../services/statistics.service';
 import { getUploadQueue } from '../queue/upload.queue';
 import { validateFile } from '../utils/file-validator';
 import { safeDeleteFile, elapsedMs } from '../utils/helpers';
@@ -23,6 +24,22 @@ import logger from '../utils/logger';
  */
 export class UploadWorker {
   private readonly config = getConfig();
+
+  // Cache for static drive assets to avoid redundant downloads
+  private assetCache = new Map<string, { caption: string; coverUrl?: string; expiresAt: number }>();
+  private readonly CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+  constructor() {
+    // Periodically clean up expired cache entries to prevent memory leaks
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, value] of this.assetCache.entries()) {
+        if (value.expiresAt < now) {
+          this.assetCache.delete(key);
+        }
+      }
+    }, 60 * 60 * 1000).unref(); // Run every 1 hour, don't block event loop exit
+  }
 
   /**
    * Processes a single upload job through the complete pipeline.
@@ -45,6 +62,19 @@ export class UploadWorker {
     let localFilePath: string | undefined;
 
     try {
+      const stageTimings = {
+        videoDownload: 0,
+        assetFetch: 0,
+        containerCreation: 0,
+        instagramProcessing: 0,
+        publish: 0,
+        driveMove: 0,
+        databaseUpdate: 0,
+        notification: 0,
+        total: 0,
+      };
+      let t0 = Date.now();
+
       // ── Step 1: Download from Google Drive ─────────────────────────────────
       await UploadJobModel.update(job.id, { status: 'DOWNLOADING' });
 
@@ -53,6 +83,8 @@ export class UploadWorker {
 
       localFilePath = downloadResult.filePath;
       await UploadJobModel.update(job.id, { localFilePath });
+
+      stageTimings.videoDownload = Date.now() - t0;
 
       logger.info('File downloaded successfully', {
         jobId: job.id,
@@ -81,6 +113,7 @@ export class UploadWorker {
       }
 
       // ── Step 3: Construct Public URL for Instagram servers ────────────────────
+      t0 = Date.now();
       await UploadJobModel.update(job.id, { status: 'UPLOADING' });
 
       const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
@@ -90,23 +123,63 @@ export class UploadWorker {
       const instagramService = getInstagramService();
       const captionService = getCaptionService();
       let caption = captionService.getCaption();
+      let coverUrl: string | undefined;
 
-      try {
-        const captionFile = await driveService.findCaptionFile(sourceFolderId);
-        if (captionFile) {
-          const downloadResult = await driveService.downloadFile(captionFile.id, captionFile.name);
-          const downloadedText = fs.readFileSync(downloadResult.filePath, 'utf-8').trim();
-          if (downloadedText) {
-            caption = downloadedText;
-            logger.info('Using dynamic caption from Google Drive', { sourceFolderId, length: caption.length });
+      const now = Date.now();
+      const cached = this.assetCache.get(sourceFolderId);
+
+      if (cached && cached.expiresAt > now) {
+        caption = cached.caption;
+        coverUrl = cached.coverUrl;
+        logger.info(`Cache HIT for folder ${sourceFolderId}`);
+      } else {
+        logger.info(`Cache MISS for folder ${sourceFolderId}. Downloading assets...`);
+        // Fetch caption
+        try {
+          const captionFile = await driveService.findCaptionFile(sourceFolderId);
+          if (captionFile) {
+            const downloadResult = await driveService.downloadFile(captionFile.id, captionFile.name);
+            const downloadedText = await fs.promises.readFile(downloadResult.filePath, 'utf-8');
+            if (downloadedText.trim()) {
+              caption = downloadedText.trim();
+              logger.info('Using dynamic caption from Google Drive', { sourceFolderId, length: caption.length });
+            }
+            // Clean up the temp caption file asynchronously
+            try {
+              await fs.promises.unlink(downloadResult.filePath);
+            } catch (err) {
+              // Ignore if already deleted
+            }
           }
-          // Clean up the temp caption file
-          fs.unlinkSync(downloadResult.filePath);
+        } catch (captionErr) {
+          logger.warn('Could not download dynamic caption file — proceeding with fallback', {
+            sourceFolderId,
+            error: captionErr instanceof Error ? captionErr.message : String(captionErr),
+          });
         }
-      } catch (captionErr) {
-        logger.warn('Could not download dynamic caption file — proceeding with fallback', {
-          sourceFolderId,
-          error: captionErr instanceof Error ? captionErr.message : String(captionErr),
+
+        // Fetch cover image
+        try {
+          const coverFile = await driveService.findCoverImage(sourceFolderId);
+          if (coverFile) {
+            const downloadResult = await driveService.downloadFile(coverFile.id, coverFile.name);
+            const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
+            const coverFileName = downloadResult.filePath.split('/').pop();
+            coverUrl = `${host}/public/tmp/${coverFileName}`;
+            logger.info('Using dynamic cover image from Google Drive', { coverUrl, sourceFolderId });
+          }
+        } catch (coverErr) {
+          logger.warn('Could not download dynamic cover image — proceeding without or with fallback', {
+            sourceFolderId,
+            error: coverErr instanceof Error ? coverErr.message : String(coverErr),
+          });
+        }
+
+        // Cache the fetched assets
+        this.assetCache.set(sourceFolderId, {
+          caption,
+          coverUrl,
+          expiresAt: now + this.CACHE_TTL_MS,
         });
       }
 
@@ -116,28 +189,13 @@ export class UploadWorker {
       const videoFileName = localFilePath.split('/').pop() ?? 'video.mp4';
       const videoUrl = `${host}/public/tmp/${videoFileName}`;
 
+      stageTimings.assetFetch = Date.now() - t0;
+
       logger.info('Exposing video via public URL for Instagram API', { videoUrl });
 
       // ── Step 4: Create Instagram Reel container ─────────────────────────────
+      t0 = Date.now();
       await UploadJobModel.update(job.id, { status: 'PROCESSING' });
-
-      let coverUrl: string | undefined;
-
-      try {
-        const coverFile = await driveService.findCoverImage(sourceFolderId);
-        if (coverFile) {
-          const downloadResult = await driveService.downloadFile(coverFile.id, coverFile.name);
-          const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
-          const coverFileName = downloadResult.filePath.split('/').pop();
-          coverUrl = `${host}/public/tmp/${coverFileName}`;
-          logger.info('Using dynamic cover image from Google Drive', { coverUrl, sourceFolderId });
-        }
-      } catch (coverErr) {
-        logger.warn('Could not download dynamic cover image — proceeding without or with fallback', {
-          sourceFolderId,
-          error: coverErr instanceof Error ? coverErr.message : String(coverErr),
-        });
-      }
 
       // Fallback to static cover image if drive folder doesn't have one
       if (!coverUrl) {
@@ -183,21 +241,27 @@ export class UploadWorker {
         instagramContainerId: container.id,
       });
 
+      stageTimings.containerCreation = Date.now() - t0;
+
       logger.info('Container created, polling for readiness', {
         jobId: job.id,
         containerId: container.id,
       });
 
       // ── Step 5: Poll until Instagram finishes processing ────────────────────
+      t0 = Date.now();
       await instagramService.waitForContainerReady(container.id);
+      stageTimings.instagramProcessing = Date.now() - t0;
 
       // ── Step 6: Publish the Reel ────────────────────────────────────────────
+      t0 = Date.now();
       await UploadJobModel.update(job.id, { status: 'PUBLISHING' });
 
       const publishResult = await instagramService.publishReel(accountId, container.id);
       const instagramMediaId = publishResult.id;
 
       await UploadJobModel.update(job.id, { status: 'COMPLETED', instagramMediaId });
+      stageTimings.publish = Date.now() - t0;
 
       logger.info('Reel published successfully', {
         jobId: job.id,
@@ -206,10 +270,13 @@ export class UploadWorker {
       });
 
       // ── Step 7: Move file to Uploaded folder in Drive ───────────────────────
+      t0 = Date.now();
       const uploadedFolderId = job.uploadedDriveFolderId ?? this.config.google.driveUploadedFolderId;
       await driveService.moveToUploaded(job.driveFileId, job.driveFileName, uploadedFolderId);
+      stageTimings.driveMove = Date.now() - t0;
 
       // ── Step 8: Record in processed_files (prevents re-upload) ─────────────
+      t0 = Date.now();
       await ProcessedFileModel.markProcessed({
         driveFileId: job.driveFileId,
         driveFileName: job.driveFileName,
@@ -234,7 +301,10 @@ export class UploadWorker {
         uploadedDriveFolderId: uploadedFolderId,
       });
 
+      stageTimings.databaseUpdate = Date.now() - t0;
+
       // ── Step 10: Send success notification (REQ-6b) ─────────────────────────
+      t0 = Date.now();
       const queueRemaining = await getUploadQueue().countPending();
       const notificationService = getNotificationService();
       await notificationService.notifySuccess({
@@ -245,13 +315,20 @@ export class UploadWorker {
         queueRemaining,
         accountId,
       });
+      stageTimings.notification = Date.now() - t0;
+
+      stageTimings.total = elapsedMs(uploadStartTime);
 
       logger.info('Upload pipeline completed successfully', {
         jobId: job.id,
         fileName: job.driveFileName,
         instagramMediaId,
         durationMs,
+        stageTimings,
       });
+
+      const statisticsService = getStatisticsService();
+      statisticsService.recordSuccess(stageTimings, job.retryCount);
 
       return true;
     } catch (error) {
@@ -293,6 +370,9 @@ export class UploadWorker {
   ): Promise<void> {
     const uploadEndTime = new Date();
     const durationMs = elapsedMs(uploadStartTime);
+
+    const statisticsService = getStatisticsService();
+    statisticsService.recordFailure(job.retryCount);
 
     await UploadJobModel.update(job.id, {
       status: 'FAILED',

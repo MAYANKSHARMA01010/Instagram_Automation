@@ -2,6 +2,7 @@ import EventEmitter from 'events';
 import { DriveFile } from '../types/drive.types';
 import { UploadJob, QueueStats } from '../types/upload.types';
 import { UploadJobModel, ProcessedFileModel } from '../database/repository';
+import { getDatabase } from '../config/database';
 import logger from '../utils/logger';
 
 /**
@@ -147,8 +148,13 @@ export class UploadQueue extends EventEmitter {
    * Used by the sequential processor to decide whether to apply the delay.
    */
   async countPending(): Promise<number> {
-    const pendingJobs = await UploadJobModel.findByStatus('PENDING');
-    return pendingJobs.filter((j) => !this.processingSet.has(j.id)).length;
+    const processingArray = Array.from(this.processingSet);
+    return getDatabase().uploadJob.count({
+      where: {
+        status: 'PENDING',
+        id: { notIn: processingArray },
+      },
+    });
   }
 }
 

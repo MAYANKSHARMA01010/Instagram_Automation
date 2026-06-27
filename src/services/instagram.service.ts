@@ -75,19 +75,19 @@ export class InstagramService {
       hasCoverUrl: !!coverUrl,
     });
 
+    const params: Record<string, string | boolean> = {
+      media_type: 'REELS',
+      video_url: videoUrl,
+      caption,
+      share_to_feed: true,
+    };
+
+    if (coverUrl) {
+      params['cover_url'] = coverUrl;
+    }
+
     return withRetry(
       async () => {
-        const params: Record<string, string | boolean> = {
-          media_type: 'REELS',
-          video_url: videoUrl,
-          caption,
-          share_to_feed: true,
-        };
-
-        if (coverUrl) {
-          params['cover_url'] = coverUrl;
-        }
-
         try {
           const response = await this.client.post<InstagramContainerCreateResponse>(
             `/${accountId}/media`,

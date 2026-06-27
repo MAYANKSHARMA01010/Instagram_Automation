@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { validateConfig, getConfig } from './config';
 import { closeDatabase, recoverStuckJobs } from './config/database';
 import { getSchedulerService } from './services/scheduler.service';
+import { getKeepAliveService } from './services/keepalive.service';
 import { getDownloadWorker } from './workers/download.worker';
 import { getNotificationService } from './services/notification.service';
 import { ensureDir } from './utils/helpers';
@@ -74,6 +75,10 @@ async function bootstrap(): Promise<void> {
   const scheduler = getSchedulerService();
   scheduler.start();
 
+  // 6.5. Start the database keepalive service
+  const keepAliveService = getKeepAliveService();
+  keepAliveService.start();
+
   // 7. Send startup notification
   const notificationService = getNotificationService();
   await notificationService.notifyStartup();
@@ -111,6 +116,10 @@ async function shutdown(signal: string): Promise<void> {
   // Stop the cron scheduler
   const scheduler = getSchedulerService();
   scheduler.stop();
+
+  // Stop the keepalive service
+  const keepAliveService = getKeepAliveService();
+  keepAliveService.stop();
 
   // Stop the download worker
   const downloadWorker = getDownloadWorker();
