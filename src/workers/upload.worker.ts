@@ -48,7 +48,7 @@ export class UploadWorker {
    * This method is guaranteed to catch and handle all errors internally.
    * It never throws — the sequential processor relies on this guarantee.
    */
-  async processJob(job: UploadJob): Promise<boolean> {
+  async processJob(job: UploadJob): Promise<{ success: boolean; restrictAccount?: boolean }> {
     const queueStartTime = job.createdAt.toISOString();
     const uploadStartTime = new Date();
 
@@ -109,7 +109,7 @@ export class UploadWorker {
         });
 
         await this.failJob(job, errorMsg, undefined, undefined, uploadStartTime, queueStartTime);
-        return false;
+        return { success: false };
       }
 
       // ── Step 3: Construct Public URL for Instagram servers ────────────────────
@@ -330,11 +330,15 @@ export class UploadWorker {
       const statisticsService = getStatisticsService();
       statisticsService.recordSuccess(stageTimings, job.retryCount);
 
-      return true;
+      return { success: true };
     } catch (error) {
       const httpStatus = this.extractHttpStatus(error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
+
+      const isRestricted = 
+        errorMessage.includes('User access is restricted') || 
+        (httpStatus === 400 && errorMessage.includes('Meta API Error'));
 
       await this.failJob(
         job,
@@ -344,7 +348,7 @@ export class UploadWorker {
         uploadStartTime,
         queueStartTime,
       );
-      return false;
+      return { success: false, restrictAccount: isRestricted };
     } finally {
       // ── Cleanup: Remove temp file regardless of outcome ────────────────────
       if (localFilePath) {

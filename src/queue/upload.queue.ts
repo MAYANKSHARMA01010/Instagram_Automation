@@ -143,10 +143,6 @@ export class UploadQueue extends EventEmitter {
     return nextJob;
   }
 
-  /**
-   * Returns the count of PENDING jobs not currently locked in processingSet.
-   * Used by the sequential processor to decide whether to apply the delay.
-   */
   async countPending(): Promise<number> {
     const processingArray = Array.from(this.processingSet);
     return getDatabase().uploadJob.count({
@@ -155,6 +151,36 @@ export class UploadQueue extends EventEmitter {
         id: { notIn: processingArray },
       },
     });
+  }
+
+  /**
+   * Cancels all pending jobs for a specific account.
+   * This is useful when an account hits rate limits or gets restricted.
+   */
+  async cancelJobsForAccount(accountId: string, reason: string): Promise<number> {
+    const pendingJobs = await UploadJobModel.findByStatus('PENDING');
+    const jobsToCancel = pendingJobs.filter(
+      (j) => j.instagramAccountId === accountId && !this.processingSet.has(j.id)
+    );
+
+    let canceledCount = 0;
+    for (const job of jobsToCancel) {
+      await UploadJobModel.update(job.id, {
+        status: 'FAILED',
+        errorMessage: reason,
+      });
+      canceledCount++;
+    }
+
+    if (canceledCount > 0) {
+      logger.warn('Canceled pending jobs for restricted account', {
+        accountId,
+        canceledCount,
+        reason,
+      });
+    }
+
+    return canceledCount;
   }
 }
 

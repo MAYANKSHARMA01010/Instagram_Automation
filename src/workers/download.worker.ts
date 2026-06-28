@@ -153,10 +153,9 @@ export class DownloadWorker {
           accountId: currentJob.instagramAccountId ?? undefined,
         });
 
-        // ── Process the job ─────────────────────────────────────────────────
-        let success = false;
+        let processResult: { success: boolean; restrictAccount?: boolean } = { success: false };
         try {
-          success = await uploadWorker.processJob(currentJob);
+          processResult = await uploadWorker.processJob(currentJob);
         } catch (unexpectedError) {
           // This should never happen — processJob() has its own try/catch.
           // Belt-and-suspenders: log and continue regardless.
@@ -169,13 +168,22 @@ export class DownloadWorker {
           queue.release(currentJob.id);
         }
 
-        if (success) {
+        if (processResult.success) {
           batchSuccess++;
         } else {
           batchFailed++;
 
-          // REQ-5: Schedule retry if under the limit; continue either way
-          if (currentJob.retryCount < getConfig().upload.maxRetryAttempts) {
+          if (processResult.restrictAccount && currentJob.instagramAccountId) {
+            logger.warn('Account is restricted by Meta API — skipping retries and canceling pending jobs', {
+              jobId: currentJob.id,
+              accountId: currentJob.instagramAccountId,
+            });
+            await queue.cancelJobsForAccount(
+              currentJob.instagramAccountId,
+              'Account restricted by Meta API'
+            );
+          } else if (currentJob.retryCount < getConfig().upload.maxRetryAttempts) {
+            // REQ-5: Schedule retry if under the limit; continue either way
             await getRetryQueue().addForRetry(currentJob);
           } else {
             logger.warn('Job exceeded max retry attempts — skipping permanently', {
