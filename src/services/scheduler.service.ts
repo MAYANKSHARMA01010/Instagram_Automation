@@ -5,18 +5,10 @@ import { getUploadQueue } from '../queue/upload.queue';
 import { getDriveService } from './google-drive.service';
 import { ProcessedFileModel, UploadLogModel } from '../database/repository';
 import { getNotificationService } from './notification.service';
+import { getHealthService } from './health.service';
+import { calculateWarmupDay, getWarmupLimit } from '../utils/warmup.util';
+import { differenceInMinutes, parse, startOfDay, addMinutes } from 'date-fns';
 
-/**
- * Scheduler service that periodically polls Google Drive for new videos
- * and enqueues them for upload.
- *
- * Guards:
- *  - Daily upload limit per account (DAILY_UPLOAD_LIMIT env var)
- *  - Same filename already uploaded today for this account → skip until tomorrow
- *  - Large queue warning when queue exceeds LARGE_QUEUE_WARNING_THRESHOLD
- *  - Token expiry warning (TOKEN_EXPIRY_DATE) — checked daily at 9 AM IST
- *  - Daily summary at midnight IST (18:30 UTC)
- */
 export class SchedulerService {
   private task: ScheduledTask | null = null;
   private dailySummaryTask: ScheduledTask | null = null;
@@ -25,9 +17,6 @@ export class SchedulerService {
   private largeQueueWarned = false; // Prevents spamming the large-queue warning
   private readonly config = getConfig();
 
-  /**
-   * Starts the cron-based polling scheduler.
-   */
   start(): void {
     const cronExpression = this.config.upload.pollingCron;
 
@@ -46,32 +35,24 @@ export class SchedulerService {
       return;
     }
 
-    // Main Drive polling task
     this.task = cron.schedule(cronExpression, () => {
       void this.runPollCycle();
     });
 
-    // Daily summary at midnight IST (18:30 UTC)
     this.dailySummaryTask = cron.schedule('30 18 * * *', () => {
       void getNotificationService().notifyDailySummary();
       logger.info('Daily summary notification sent');
     });
 
-    // Token expiry check every morning at 9 AM IST (3:30 UTC)
     this.tokenExpiryTask = cron.schedule('30 3 * * *', () => {
       void this.checkTokenExpiry();
     });
 
     logger.info('Scheduler started', { cron: cronExpression });
-
-    // Run immediately on startup
     void this.runPollCycle();
     void this.checkTokenExpiry();
   }
 
-  /**
-   * Stops the cron scheduler.
-   */
   stop(): void {
     if (this.task) {
       this.task.stop();
@@ -88,16 +69,10 @@ export class SchedulerService {
     }
   }
 
-  /**
-   * Returns whether the scheduler is currently active.
-   */
   isActive(): boolean {
     return this.task !== null;
   }
 
-  /**
-   * Checks if the Graph API token is expiring soon and sends a Telegram warning.
-   */
   private async checkTokenExpiry(): Promise<void> {
     const expiryDate = this.config.instagram.tokenExpiryDate;
     if (!expiryDate) return;
@@ -119,13 +94,6 @@ export class SchedulerService {
     }
   }
 
-  /**
-   * Runs a single poll cycle:
-   * 1. Lists new MP4 files from Drive
-   * 2. Applies daily limit, same-day duplicate, and already-processed guards
-   * 3. Enqueues new files for upload
-   * 4. Warns if queue is unusually large
-   */
   async runPollCycle(): Promise<void> {
     if (this.isRunning) {
       logger.debug('Poll cycle already in progress, skipping');
@@ -138,8 +106,9 @@ export class SchedulerService {
     try {
       const driveService = getDriveService();
       const accounts = this.config.accounts;
-      const dailyLimit = this.config.upload.dailyUploadLimit; // 0 = unlimited
       const queueWarningThreshold = this.config.upload.largeQueueWarningThreshold;
+      const healthService = getHealthService();
+      const queue = getUploadQueue();
 
       let totalEnqueued = 0;
       let totalSkipped = 0;
@@ -147,88 +116,136 @@ export class SchedulerService {
       for (const account of accounts) {
         if (!account.driveFolderId) continue;
 
-        const files = await driveService.listVideoFiles({ folderId: account.driveFolderId });
+        const accountId = account.instagramAccountId;
 
-        if (files.length === 0) {
-          logger.info('No new video files found in Drive folder', { folderId: account.driveFolderId });
+        // ── 1. Check Cooldown ──
+        if (this.config.upload.enableHealthScoring && await healthService.checkCooldown(accountId)) {
+          logger.info('Account is in cooldown, skipping poll', { accountId });
           continue;
         }
 
-        const queue = getUploadQueue();
-        let enqueued = 0;
-        let skipped = 0;
+        // ── 2. Calculate Today's Limit ──
+        let todayLimit = this.config.upload.dailyUploadLimit; // Global fallback
+        let isAdaptiveEnabled = this.config.upload.enableAdaptiveWarmup;
+        if (account.enableAdaptiveWarmup !== undefined) {
+          isAdaptiveEnabled = account.enableAdaptiveWarmup;
+        }
 
-        // ── Daily limit check ──────────────────────────────────────────────
-        if (dailyLimit > 0) {
-          const uploadedToday = await UploadLogModel.countTodaySuccessByAccount(account.instagramAccountId);
-          if (uploadedToday >= dailyLimit) {
-            logger.info('Daily upload limit reached for account — skipping all files', {
-              account: account.accountName ?? account.instagramAccountId,
-              uploadedToday,
-              dailyLimit,
-            });
-            await getNotificationService().notifyDailyLimitReached(
-              account.accountName ?? account.instagramAccountId,
-              account.instagramAccountId,
-              dailyLimit,
-            );
-            totalSkipped += files.length;
-            continue;
+        if (account.enableWarmup || account.isNewAccount) {
+          const targetLimit = account.targetDailyLimit ?? this.config.upload.targetDailyLimit;
+          const day = calculateWarmupDay(account.warmupStartDate);
+          let baseLimit = getWarmupLimit(day, targetLimit);
+          
+          if (isAdaptiveEnabled && this.config.upload.enableHealthScoring) {
+            const health = await healthService.getHealth(accountId);
+            const band = healthService.getHealthBand(health.healthScore);
+            
+            if (health.healthScore < 50) {
+              // Post-cooldown or critical recovery: strictly clamp limit to 25%
+              baseLimit = Math.max(1, Math.floor(baseLimit * 0.25));
+            } else if (band === 'Danger') {
+              baseLimit = Math.max(1, Math.floor(baseLimit * 0.75));
+            } else if (band === 'Caution') {
+              const yesterday = Math.max(1, day - 1);
+              baseLimit = getWarmupLimit(yesterday, targetLimit);
+            }
+          }
+          todayLimit = baseLimit;
+          
+          // The strict global daily limit always overrides the target warm-up limit if set lower.
+          if (this.config.upload.dailyUploadLimit > 0) {
+            todayLimit = Math.min(todayLimit, this.config.upload.dailyUploadLimit);
           }
         }
 
+        // ── 3. Calculate Distribution (Pacing) ──
+        const windowStartStr = account.postingWindowStart ?? this.config.upload.postingWindowStart ?? '00:00';
+        const windowEndStr = account.postingWindowEnd ?? this.config.upload.postingWindowEnd ?? '23:59';
+        
+        const now = new Date();
+        const todayStart = startOfDay(now);
+        
+        let windowStart = parse(windowStartStr, 'HH:mm', todayStart);
+        let windowEnd = parse(windowEndStr, 'HH:mm', todayStart);
+        
+        // If window crosses midnight (e.g. 20:00 to 08:00)
+        if (windowEnd <= windowStart) {
+          if (now < windowEnd) {
+            // We are in the morning hours (e.g. 02:00). The window actually started yesterday.
+            windowStart = addMinutes(windowStart, -24 * 60);
+          } else {
+            // We are in the evening hours (e.g. 22:00). The window ends tomorrow.
+            windowEnd = addMinutes(windowEnd, 24 * 60);
+          }
+        }
+
+        let expectedUploads = todayLimit;
+        if (todayLimit > 0) {
+          if (now >= windowStart && now <= windowEnd) {
+            const elapsedMinutes = differenceInMinutes(now, windowStart);
+            const totalWindowMinutes = differenceInMinutes(windowEnd, windowStart);
+            const progress = Math.min(Math.max(elapsedMinutes / totalWindowMinutes, 0), 1);
+            expectedUploads = Math.floor(todayLimit * progress) + 1;
+          } else if (now < windowStart) {
+            expectedUploads = 0; // Window hasn't started yet
+          }
+        }
+
+        const uploadedToday = await UploadLogModel.countTodaySuccessByAccount(accountId);
+        const inQueue = await queue.countPendingForAccount(accountId);
+
+        // Limit reached for the day
+        if (todayLimit > 0 && (uploadedToday + inQueue >= todayLimit)) {
+          if (inQueue === 0 && uploadedToday === todayLimit) {
+            logger.info('Daily upload limit reached for account', { accountId, uploadedToday, todayLimit });
+            // Only notify if we exactly just hit it to avoid spam, though state tracking would be better.
+            // For now, it will just quietly skip.
+          }
+          continue;
+        }
+
+        // Pacing limit reached
+        if (todayLimit > 0 && (uploadedToday + inQueue >= expectedUploads)) {
+          logger.debug('Upload pacing active: ahead of schedule', { accountId, uploadedToday, inQueue, expectedUploads, todayLimit });
+          continue;
+        }
+
+        // Calculate how many we are allowed to enqueue right now
+        const allowedToEnqueue = todayLimit > 0 ? (expectedUploads - (uploadedToday + inQueue)) : Infinity;
+        if (allowedToEnqueue <= 0) continue;
+
+        // ── 4. Fetch from Drive ──
+        const files = await driveService.listVideoFiles({ folderId: account.driveFolderId });
+        if (files.length === 0) continue;
+
+        let enqueued = 0;
+        let skipped = 0;
+
         for (const file of files) {
-          // ── Guard 1: Already permanently processed (Drive file ID match) ──
+          if (enqueued >= allowedToEnqueue) {
+            skipped++; // Skip remaining to respect pacing
+            continue;
+          }
+
           if (await ProcessedFileModel.isProcessed(file.id)) {
-            logger.debug('Skipping already processed file', { fileId: file.id, name: file.name });
             skipped++;
             continue;
           }
 
-          // ── Guard 2: Same filename already uploaded today for this account ──
-          // This allows the same video to be re-uploaded on a different day,
-          // but prevents duplicate uploads within the same day.
-          if (await UploadLogModel.wasUploadedTodayByName(file.name, account.instagramAccountId)) {
-            logger.info('Skipping file — same filename already uploaded today for this account', {
-              fileName: file.name,
-              accountId: account.instagramAccountId,
-            });
+          if (await UploadLogModel.wasUploadedTodayByName(file.name, accountId)) {
             skipped++;
             continue;
           }
 
-          // ── Guard 3: Already in the queue ─────────────────────────────────
           if (await queue.isProcessing(file.id)) {
-            logger.debug('File already in queue', { fileId: file.id, name: file.name });
             skipped++;
             continue;
           }
 
-          // ── Enforce per-account daily limit mid-batch ──────────────────────
-          if (dailyLimit > 0) {
-            const uploadedToday = await UploadLogModel.countTodaySuccessByAccount(account.instagramAccountId);
-            const inQueue = await queue.countPendingForAccount(account.instagramAccountId);
-            if (uploadedToday + inQueue >= dailyLimit) {
-              logger.info('Daily limit will be reached — stopping enqueue for account', {
-                account: account.accountName ?? account.instagramAccountId,
-                uploadedToday,
-                inQueue,
-                dailyLimit,
-              });
-              skipped++;
-              continue;
-            }
-          }
-
-          // ── Enqueue ────────────────────────────────────────────────────────
-          const job = await queue.enqueue(file, account.instagramAccountId, account.driveUploadedFolderId);
+          const job = await queue.enqueue(file, accountId, account.driveUploadedFolderId);
           if (job) {
             enqueued++;
-            logger.info('Enqueued file for upload', {
-              fileId: file.id,
-              name: file.name,
-              accountId: account.instagramAccountId,
-            });
+            logger.info('Enqueued file for upload', { fileId: file.id, name: file.name, accountId });
           } else {
             skipped++;
           }
@@ -237,15 +254,26 @@ export class SchedulerService {
         totalEnqueued += enqueued;
         totalSkipped += skipped;
 
-        logger.info('Poll cycle complete for folder', {
-          folderId: account.driveFolderId,
-          total: files.length,
+        const auditLogData = {
+          accountId,
           enqueued,
           skipped,
-        });
+          allowedToEnqueue,
+          expectedUploads,
+          todayLimit,
+          uploadedToday,
+          inQueue,
+          postingWindowStart: windowStartStr,
+          postingWindowEnd: windowEndStr
+        };
+
+        if (enqueued > 0) {
+          logger.info('Poll cycle complete for account (Audit)', auditLogData);
+        } else {
+          logger.debug('Poll cycle complete (No action taken)', auditLogData);
+        }
       }
 
-      // ── Large queue warning ────────────────────────────────────────────────
       if (queueWarningThreshold > 0) {
         const queue = getUploadQueue();
         const stats = await queue.getStats();
@@ -256,7 +284,6 @@ export class SchedulerService {
           logger.warn('Large upload queue detected', { totalPending, queueWarningThreshold });
           await getNotificationService().notifyLargeQueue(totalPending, queueWarningThreshold);
         } else if (totalPending < queueWarningThreshold) {
-          // Reset so we can warn again if it fills up again
           this.largeQueueWarned = false;
         }
       }
@@ -274,9 +301,7 @@ export class SchedulerService {
   }
 }
 
-// Singleton
 let schedulerService: SchedulerService | null = null;
-
 export function getSchedulerService(): SchedulerService {
   if (!schedulerService) {
     schedulerService = new SchedulerService();

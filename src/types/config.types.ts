@@ -45,6 +45,12 @@ export interface UploadConfig {
   dailyUploadLimit: number;
   /** Send a Telegram warning if queue grows beyond this size */
   largeQueueWarningThreshold: number;
+  targetDailyLimit: number;
+  defaultCooldownHours: number;
+  enableAdaptiveWarmup: boolean;
+  enableHealthScoring: boolean;
+  postingWindowStart: string;
+  postingWindowEnd: string;
 }
 
 export interface DatabaseConfig {
@@ -68,6 +74,16 @@ export interface AccountMapping {
   driveUploadedFolderId: string;
   accountName?: string;
   telegramThreadId?: string;
+  isNewAccount?: boolean;
+  warmupStartDate?: string;
+  enableWarmup?: boolean;
+  enableAdaptiveWarmup?: boolean;
+  targetDailyLimit?: number;
+  minimumDailyLimit?: number;
+  maximumDailyLimit?: number;
+  cooldownHours?: number;
+  postingWindowStart?: string; // e.g. "08:00"
+  postingWindowEnd?: string;   // e.g. "20:00"
 }
 
 export interface Config {

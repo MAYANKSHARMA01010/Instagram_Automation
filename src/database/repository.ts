@@ -257,6 +257,42 @@ export const UploadJobModel = {
   },
 
   /**
+   * Safely creates an upload job, returning null if a job with the same driveFileId already exists.
+   */
+  async createSafe(
+    data: Omit<UploadJob, 'id' | 'createdAt' | 'updatedAt' | 'retryCount'>,
+  ): Promise<UploadJob | null> {
+    try {
+      const db = getDatabase();
+      const id = generateId();
+      
+      const job = await db.uploadJob.create({
+        data: {
+          id,
+          driveFileId: data.driveFileId,
+          driveFileName: data.driveFileName,
+          localFilePath: data.localFilePath ?? null,
+          instagramAccountId: data.instagramAccountId ?? null,
+          uploadedDriveFolderId: data.uploadedDriveFolderId ?? null,
+          status: data.status,
+          processingAt: data.processingAt ?? null,
+          retryCount: 0,
+          instagramContainerId: data.instagramContainerId ?? null,
+          instagramMediaId: data.instagramMediaId ?? null,
+          errorMessage: data.errorMessage ?? null,
+          errorStack: data.errorStack ?? null,
+        },
+      });
+      return mapUploadJob(job);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  /**
    * Updates a job's status and optional fields.
    */
   async update(id: string, data: Partial<UploadJob>): Promise<void> {
@@ -327,6 +363,43 @@ export const UploadJobModel = {
     });
     return count > 0;
   },
+};
+
+// ─── Account Health ─────────────────────────────────────────────────────────────
+
+export const AccountHealthModel = {
+  /**
+   * Upserts the health record for an account. Defaults to score 100 if new.
+   */
+  async getOrCreate(instagramAccountId: string) {
+    const db = getDatabase();
+    return db.accountHealth.upsert({
+      where: { instagramAccountId },
+      create: { instagramAccountId, healthScore: 100 },
+      update: {},
+    });
+  },
+
+  /**
+   * Retrieves the health record. Returns null if not found.
+   */
+  async get(instagramAccountId: string) {
+    const db = getDatabase();
+    return db.accountHealth.findUnique({
+      where: { instagramAccountId },
+    });
+  },
+
+  /**
+   * Updates specific fields of an account's health record.
+   */
+  async update(instagramAccountId: string, data: any) {
+    const db = getDatabase();
+    return db.accountHealth.update({
+      where: { instagramAccountId },
+      data,
+    });
+  }
 };
 
 // ─── Row Mappers ──────────────────────────────────────────────────────────────

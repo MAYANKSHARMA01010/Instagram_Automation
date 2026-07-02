@@ -32,13 +32,18 @@ export class UploadQueue extends EventEmitter {
       return null;
     }
 
-    const job = await UploadJobModel.create({
+    const job = await UploadJobModel.createSafe({
       driveFileId: driveFile.id,
       driveFileName: driveFile.name,
       status: 'PENDING',
       instagramAccountId,
       uploadedDriveFolderId,
     });
+
+    if (!job) {
+      logger.debug('Job insertion failed (unique constraint), duplicate prevented', { fileId: driveFile.id });
+      return null;
+    }
 
     logger.info('Job added to queue', { jobId: job.id, fileName: driveFile.name });
     this.emit('job:added', job);
@@ -55,13 +60,17 @@ export class UploadQueue extends EventEmitter {
     instagramAccountId: string,
     uploadedDriveFolderId: string
   ): Promise<UploadJob> {
-    const job = await UploadJobModel.create({
+    const job = await UploadJobModel.createSafe({
       driveFileId,
       driveFileName,
       status: 'PENDING',
       instagramAccountId,
       uploadedDriveFolderId,
     });
+
+    if (!job) {
+      throw new Error(`Job for file ${driveFileId} is already in the queue or processed.`);
+    }
 
     logger.info('Job manually enqueued', { jobId: job.id, driveFileId, driveFileName });
     this.emit('job:added', job);

@@ -18,6 +18,7 @@ export interface UploadJob {
   driveFileName: string;
   localFilePath?: string;
   status: UploadStatus;
+  processingAt?: Date | null;
   retryCount: number;
   createdAt: Date;
   updatedAt: Date;

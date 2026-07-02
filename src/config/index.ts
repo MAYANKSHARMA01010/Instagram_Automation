@@ -58,7 +58,9 @@ function parseAccountsConfig(): AccountMapping[] {
   return [{
     instagramAccountId: process.env.INSTAGRAM_ACCOUNT_ID ?? '',
     driveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? '',
-    driveUploadedFolderId: process.env.GOOGLE_DRIVE_UPLOADED_FOLDER_ID ?? ''
+    driveUploadedFolderId: process.env.GOOGLE_DRIVE_UPLOADED_FOLDER_ID ?? '',
+    isNewAccount: process.env.IS_NEW_ACCOUNT === 'true',
+    warmupStartDate: process.env.WARMUP_START_DATE,
   }];
 }
 
@@ -105,6 +107,12 @@ export function loadConfig(): Config {
       uploadDelaySeconds: parseInt(process.env.UPLOAD_DELAY_SECONDS ?? '120', 10),
       dailyUploadLimit: parseInt(process.env.DAILY_UPLOAD_LIMIT ?? '0', 10), // 0 = unlimited
       largeQueueWarningThreshold: parseInt(process.env.LARGE_QUEUE_WARNING_THRESHOLD ?? '10', 10),
+      targetDailyLimit: parseInt(process.env.TARGET_DAILY_LIMIT ?? '32', 10),
+      defaultCooldownHours: parseInt(process.env.DEFAULT_COOLDOWN_HOURS ?? '48', 10),
+      enableAdaptiveWarmup: process.env.ENABLE_ADAPTIVE_WARMUP !== 'false', // true by default
+      enableHealthScoring: process.env.ENABLE_HEALTH_SCORING !== 'false',   // true by default
+      postingWindowStart: process.env.POSTING_WINDOW_START ?? '08:00',
+      postingWindowEnd: process.env.POSTING_WINDOW_END ?? '22:00',
     },
     database: {
       sqlitePath: path.resolve(process.cwd(), process.env.SQLITE_PATH ?? './database/uploads.db'),

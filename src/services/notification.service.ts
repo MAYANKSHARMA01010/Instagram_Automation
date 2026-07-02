@@ -328,6 +328,80 @@ export class NotificationService {
     );
   }
 
+  // ─── Health & Warm-up Notifications ──────────────────────────────────────
+
+  async notifyWarmupStarted(accountId: string, day: number, limit: number): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `🌱 *Warm-up Started*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n` +
+      `📅 *Day:* ${day} of 30\n` +
+      `📈 *Today's Limit:* ${limit} videos\n\n` +
+      `Uploads will be spaced out naturally throughout your configured posting window.`
+    );
+  }
+
+  async notifyWarmupCompleted(accountId: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `🎉 *Warm-up Completed!*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n\n` +
+      `This account has successfully survived the 30-day warm-up period. Target limits are now unlocked.`
+    );
+  }
+
+  async notifyCooldownStarted(accountId: string, hours: number, score: number): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `🚨 *CRITICAL: Account in Cooldown*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n` +
+      `💔 *Health Score:* ${score}/100 (Critical)\n` +
+      `⏸️ *Action:* Halting all uploads for ${hours} hours.\n\n` +
+      `The bot will automatically resume after the cooldown expires.`
+    );
+  }
+
+  async notifyCooldownEnded(accountId: string, score: number): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `🟢 *Cooldown Expired*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n` +
+      `💔 *Health Score:* ${score}/100\n\n` +
+      `Resuming uploads cautiously.`
+    );
+  }
+
+  async notifyHealthDegraded(accountId: string, oldBand: string, newBand: string, score: number): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `📉 *Health Score Degraded*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n` +
+      `💔 *Score:* ${score}/100\n` +
+      `🚦 *Band:* ${oldBand} ➡️ ${newBand}\n\n` +
+      `Action blocked or checkpoint detected. Proceeding with extreme caution.`
+    );
+  }
+
+  async notifyHealthRecovered(accountId: string, oldBand: string, newBand: string, score: number): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `📈 *Health Score Recovered*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n` +
+      `💚 *Score:* ${score}/100\n` +
+      `🚦 *Band:* ${oldBand} ➡️ ${newBand}`
+    );
+  }
+
+  async notifyRestrictionDetected(accountId: string, errorMessage: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    await this.sendMessage(
+      `⚠️ *Platform Restriction Detected*\n\n` +
+      `👤 *Account:* \`${accountId}\`\n` +
+      `💬 *Details:* ${this.esc(errorMessage)}\n\n` +
+      `Heavy penalty applied to health score.`
+    );
+  }
+
   // ─── Private Helpers ─────────────────────────────────────────────────────
 
   /**

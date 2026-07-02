@@ -11,6 +11,7 @@ import { validateFile } from '../utils/file-validator';
 import { safeDeleteFile, elapsedMs } from '../utils/helpers';
 import { getConfig } from '../config';
 import logger from '../utils/logger';
+import { getHealthService } from '../services/health.service';
 
 /**
  * Core upload worker that orchestrates the full upload pipeline:
@@ -76,7 +77,7 @@ export class UploadWorker {
       let t0 = Date.now();
 
       // ── Step 1: Download from Google Drive ─────────────────────────────────
-      await UploadJobModel.update(job.id, { status: 'DOWNLOADING' });
+      await UploadJobModel.update(job.id, { status: 'DOWNLOADING', processingAt: new Date() });
 
       const driveService = getDriveService();
       const downloadResult = await driveService.downloadFile(job.driveFileId, job.driveFileName);
@@ -329,6 +330,8 @@ export class UploadWorker {
 
       const statisticsService = getStatisticsService();
       statisticsService.recordSuccess(stageTimings, job.retryCount, accountId);
+      
+      await getHealthService().recordSuccess(accountId);
 
       return { success: true };
     } catch (error) {
@@ -377,6 +380,10 @@ export class UploadWorker {
 
     const statisticsService = getStatisticsService();
     statisticsService.recordFailure(job.retryCount, errorMessage, job.instagramAccountId ?? undefined);
+
+    if (job.instagramAccountId) {
+      await getHealthService().recordFailure(job.instagramAccountId, errorMessage);
+    }
 
     await UploadJobModel.update(job.id, {
       status: 'FAILED',
