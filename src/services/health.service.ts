@@ -1,4 +1,5 @@
 import { AccountHealthModel } from '../database/repository';
+import { Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 import { getNotificationService } from './notification.service';
 import { getConfig } from '../config';
@@ -49,19 +50,19 @@ export class HealthService {
     if (!this.config.upload.enableHealthScoring) return;
 
     const health = await this.getHealth(accountId);
-    
+
     // Only increase score once every 5 successes
     const newSuccessfulUploads = health.successfulUploads + 1;
     let newScore = health.healthScore;
     if (newSuccessfulUploads % 5 === 0) {
       newScore = Math.min(100, health.healthScore + 1);
     }
-    
+
     await AccountHealthModel.update(accountId, {
       healthScore: newScore,
       successfulUploads: newSuccessfulUploads,
       lastSuccessfulUpload: new Date(),
-      lastUploadTime: new Date()
+      lastUploadTime: new Date(),
     });
 
     // Notify if we recovered a band
@@ -85,7 +86,11 @@ export class HealthService {
     if (msg.includes('checkpoint_required')) {
       penalty = 30;
       isRestriction = true;
-    } else if (msg.includes('action_blocked') || msg.includes('action blocked') || msg.includes('not permitted')) {
+    } else if (
+      msg.includes('action_blocked') ||
+      msg.includes('action blocked') ||
+      msg.includes('not permitted')
+    ) {
       penalty = 40;
       isRestriction = true;
     } else if (msg.includes('challenge_required')) {
@@ -93,17 +98,21 @@ export class HealthService {
       isRestriction = true;
     } else if (msg.includes('feedback_required')) {
       penalty = 15;
-    } else if (msg.includes('login_required') || msg.includes('auth error') || msg.includes('session_expired')) {
+    } else if (
+      msg.includes('login_required') ||
+      msg.includes('auth error') ||
+      msg.includes('session_expired')
+    ) {
       penalty = 20;
     }
 
     const newScore = Math.max(0, health.healthScore - penalty);
 
-    const updateData: any = {
+    const updateData: Prisma.AccountHealthUpdateInput = {
       healthScore: newScore,
       failedUploads: health.failedUploads + 1,
       lastUploadFailure: new Date(),
-      lastUploadTime: new Date()
+      lastUploadTime: new Date(),
     };
 
     if (isRestriction) {
@@ -116,12 +125,16 @@ export class HealthService {
     // Trigger cooldown if critical
     if (newScore < 40 && (!health.cooldownUntil || health.cooldownUntil < new Date())) {
       // Find the account mapping to get specific cooldown hours, else fallback to default
-      const accountConfig = this.config.accounts.find(a => a.instagramAccountId === accountId);
+      const accountConfig = this.config.accounts.find((a) => a.instagramAccountId === accountId);
       const cooldownHours = accountConfig?.cooldownHours ?? this.config.upload.defaultCooldownHours;
       const cooldownDate = new Date(Date.now() + cooldownHours * 60 * 60 * 1000);
       updateData.cooldownUntil = cooldownDate;
-      
-      logger.error('Account health critical, entering cooldown', { accountId, newScore, cooldownDate });
+
+      logger.error('Account health critical, entering cooldown', {
+        accountId,
+        newScore,
+        cooldownDate,
+      });
       await getNotificationService().notifyCooldownStarted(accountId, cooldownHours, newScore);
     }
 
@@ -139,7 +152,7 @@ export class HealthService {
    */
   async checkCooldown(accountId: string): Promise<boolean> {
     const health = await this.getHealth(accountId);
-    
+
     if (health.cooldownUntil) {
       if (health.cooldownUntil > new Date()) {
         return true; // Still in cooldown
@@ -154,7 +167,11 @@ export class HealthService {
     return false;
   }
 
-  private async notifyBandChange(accountId: string, oldScore: number, newScore: number): Promise<void> {
+  private async notifyBandChange(
+    accountId: string,
+    oldScore: number,
+    newScore: number,
+  ): Promise<void> {
     const oldBand = this.getHealthBand(oldScore);
     const newBand = this.getHealthBand(newScore);
 

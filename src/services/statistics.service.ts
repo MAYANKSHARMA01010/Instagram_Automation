@@ -24,7 +24,7 @@ export interface DailySummary {
   failuresToday: number;
   retriesToday: number;
   successRate: string;
-  metaApiCallsToday: number;  // each upload = 2 calls (container + publish)
+  metaApiCallsToday: number; // each upload = 2 calls (container + publish)
   avgUploadTimeSeconds: number;
   errorBreakdown: Record<string, number>;
   accountSummaries: AccountStats[];
@@ -54,7 +54,7 @@ class StatisticsService {
     this.currentDay = new Date().getDate();
   }
 
-  private checkReset() {
+  private checkReset(): void {
     const today = new Date().getDate();
     if (this.currentDay !== today) {
       this.currentDay = today;
@@ -81,7 +81,7 @@ class StatisticsService {
   private getAccountBucket(accountId: string): AccountStats {
     if (!this.accountStats.has(accountId)) {
       const config = getConfig();
-      const account = config.accounts.find(a => a.instagramAccountId === accountId);
+      const account = config.accounts.find((a) => a.instagramAccountId === accountId);
       this.accountStats.set(accountId, {
         accountName: account?.accountName ?? accountId,
         instagramAccountId: accountId,
@@ -100,9 +100,11 @@ class StatisticsService {
   categoriseError(errorMessage: string): string {
     const msg = errorMessage.toLowerCase();
     if (msg.includes('user access is restricted')) return 'Daily Limit Reached';
-    if (msg.includes('rate limit') || msg.includes('too many calls') || msg.includes('throttled')) return 'Rate Limited';
+    if (msg.includes('rate limit') || msg.includes('too many calls') || msg.includes('throttled'))
+      return 'Rate Limited';
     if (msg.includes('token') || msg.includes('oauth') || msg.includes('auth')) return 'Auth Error';
-    if (msg.includes('network') || msg.includes('econnreset') || msg.includes('timeout')) return 'Network Error';
+    if (msg.includes('network') || msg.includes('econnreset') || msg.includes('timeout'))
+      return 'Network Error';
     if (msg.includes('validation') || msg.includes('invalid')) return 'Validation Error';
     return 'Other Error';
   }
@@ -113,10 +115,10 @@ class StatisticsService {
   getDailySummary(): DailySummary {
     this.checkReset();
     const totalAttempts = this.uploadsToday + this.failuresToday;
-    const successRate = totalAttempts === 0 ? '0.0%' : `${((this.uploadsToday / totalAttempts) * 100).toFixed(1)}%`;
-    const avgUploadTimeSeconds = this.uploadsToday === 0
-      ? 0
-      : Math.round(this.timingSums.total / this.uploadsToday / 1000);
+    const successRate =
+      totalAttempts === 0 ? '0.0%' : `${((this.uploadsToday / totalAttempts) * 100).toFixed(1)}%`;
+    const avgUploadTimeSeconds =
+      this.uploadsToday === 0 ? 0 : Math.round(this.timingSums.total / this.uploadsToday / 1000);
 
     return {
       uploadsToday: this.uploadsToday,
@@ -130,7 +132,7 @@ class StatisticsService {
     };
   }
 
-  recordSuccess(timings: Partial<StageAverages>, retries: number, accountId?: string) {
+  recordSuccess(timings: Partial<StageAverages>, retries: number, accountId?: string): void {
     this.checkReset();
     this.uploadsToday++;
     this.retriesToday += retries;
@@ -154,7 +156,7 @@ class StatisticsService {
     this.logSummary();
   }
 
-  recordFailure(retries: number, errorMessage?: string, accountId?: string) {
+  recordFailure(retries: number, errorMessage?: string, accountId?: string): void {
     this.checkReset();
     this.failuresToday++;
     this.retriesToday += retries;
@@ -175,11 +177,11 @@ class StatisticsService {
     this.logSummary();
   }
 
-  private logSummary() {
+  private logSummary(): void {
     const totalAttempts = this.uploadsToday + this.failuresToday;
     const successRate = totalAttempts === 0 ? 0 : (this.uploadsToday / totalAttempts) * 100;
-    
-    const avg = (sum: number) => this.uploadsToday === 0 ? 0 : sum / this.uploadsToday;
+
+    const avg = (sum: number): number => (this.uploadsToday === 0 ? 0 : sum / this.uploadsToday);
 
     logger.info('Daily Upload Summary Statistics', {
       uploadsToday: this.uploadsToday,
@@ -195,7 +197,7 @@ class StatisticsService {
         instagramProcessing: Math.round(avg(this.timingSums.instagramProcessing)),
         publish: Math.round(avg(this.timingSums.publish)),
         total: Math.round(avg(this.timingSums.total)),
-      }
+      },
     });
   }
 }

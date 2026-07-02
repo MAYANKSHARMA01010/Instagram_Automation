@@ -1,4 +1,5 @@
 import { getDatabase } from '../config/database';
+import { Prisma } from '@prisma/client';
 import {
   UploadLog,
   ProcessedFile,
@@ -138,7 +139,10 @@ export const UploadLogModel = {
    * Returns true if a file with the given name was already uploaded today for a given account.
    * Used to prevent re-uploading same-named videos on the same day across multiple accounts.
    */
-  async wasUploadedTodayByName(driveFileName: string, instagramAccountId: string): Promise<boolean> {
+  async wasUploadedTodayByName(
+    driveFileName: string,
+    instagramAccountId: string,
+  ): Promise<boolean> {
     const db = getDatabase();
 
     const now = new Date();
@@ -265,7 +269,7 @@ export const UploadJobModel = {
     try {
       const db = getDatabase();
       const id = generateId();
-      
+
       const job = await db.uploadJob.create({
         data: {
           id,
@@ -284,8 +288,8 @@ export const UploadJobModel = {
         },
       });
       return mapUploadJob(job);
-    } catch (error: any) {
-      if (error.code === 'P2002') {
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         return null;
       }
       throw error;
@@ -371,7 +375,7 @@ export const AccountHealthModel = {
   /**
    * Upserts the health record for an account. Defaults to score 100 if new.
    */
-  async getOrCreate(instagramAccountId: string) {
+  async getOrCreate(instagramAccountId: string): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs>> {
     const db = getDatabase();
     return db.accountHealth.upsert({
       where: { instagramAccountId },
@@ -383,7 +387,7 @@ export const AccountHealthModel = {
   /**
    * Retrieves the health record. Returns null if not found.
    */
-  async get(instagramAccountId: string) {
+  async get(instagramAccountId: string): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs> | null> {
     const db = getDatabase();
     return db.accountHealth.findUnique({
       where: { instagramAccountId },
@@ -393,17 +397,26 @@ export const AccountHealthModel = {
   /**
    * Updates specific fields of an account's health record.
    */
-  async update(instagramAccountId: string, data: any) {
+  async update(
+    instagramAccountId: string,
+    data: Prisma.AccountHealthUpdateInput,
+  ): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs>> {
     const db = getDatabase();
     return db.accountHealth.update({
       where: { instagramAccountId },
       data,
     });
-  }
+  },
 };
 
 // ─── Row Mappers ──────────────────────────────────────────────────────────────
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapUploadLog(row: any): UploadLog {
   return {
     id: row.id,
@@ -423,6 +436,7 @@ function mapUploadLog(row: any): UploadLog {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapProcessedFile(row: any): ProcessedFile {
   return {
     id: row.id,

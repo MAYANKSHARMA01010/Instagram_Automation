@@ -36,15 +36,15 @@ export class GoogleDriveService {
         let pageToken: string | undefined = undefined;
 
         do {
-          const response: any = await this.drive.files.list({
+          const response = (await this.drive.files.list({
             q: `'${folderId}' in parents and mimeType = 'video/mp4' and trashed = false`,
             fields: 'nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime)',
             orderBy: 'createdTime asc',
             pageSize: options?.pageSize ?? 50,
             pageToken: pageToken,
-          });
+          })) as unknown as { data: { files?: drive_v3.Schema$File[]; nextPageToken?: string } };
 
-          const files: DriveFile[] = (response.data.files ?? []).map((f: any) => ({
+          const files: DriveFile[] = (response.data.files ?? []).map((f) => ({
             id: f.id ?? '',
             name: f.name ?? '',
             mimeType: f.mimeType ?? '',
@@ -77,11 +77,11 @@ export class GoogleDriveService {
     return withRetry(
       async () => {
         logger.info('Searching for cover image in Drive folder', { folderId });
-        const response: any = await this.drive.files.list({
+        const response = (await this.drive.files.list({
           q: `'${folderId}' in parents and (name = 'cover.jpg' or name = 'cover.jpeg') and trashed = false`,
           fields: 'files(id, name, mimeType, size, createdTime, modifiedTime)',
           pageSize: 1,
-        });
+        })) as unknown as { data: { files?: drive_v3.Schema$File[] } };
 
         const files = response.data.files ?? [];
         if (files.length === 0) return null;
@@ -99,7 +99,7 @@ export class GoogleDriveService {
       {
         maxAttempts: this.config.upload.maxRetryAttempts,
         baseDelayMs: this.config.upload.retryBaseDelayMs,
-      }
+      },
     );
   }
 
@@ -110,11 +110,11 @@ export class GoogleDriveService {
     return withRetry(
       async () => {
         logger.info('Searching for caption.txt in Drive folder', { folderId });
-        const response: any = await this.drive.files.list({
+        const response = (await this.drive.files.list({
           q: `'${folderId}' in parents and name = 'caption.txt' and trashed = false`,
           fields: 'files(id, name, mimeType, size, createdTime, modifiedTime)',
           pageSize: 1,
-        });
+        })) as unknown as { data: { files?: drive_v3.Schema$File[] } };
 
         const files = response.data.files ?? [];
         if (files.length === 0) return null;
@@ -132,7 +132,7 @@ export class GoogleDriveService {
       {
         maxAttempts: this.config.upload.maxRetryAttempts,
         baseDelayMs: this.config.upload.retryBaseDelayMs,
-      }
+      },
     );
   }
 
@@ -212,7 +212,6 @@ export class GoogleDriveService {
    * This is the Google Drive equivalent of a file move operation.
    */
   async moveToUploaded(fileId: string, fileName: string, uploadedFolderId: string): Promise<void> {
-
     return withRetry(
       async () => {
         logger.info('Moving file to Uploaded folder', {

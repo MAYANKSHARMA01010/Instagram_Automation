@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger';
+import { getConfig } from './index';
 
 let prisma: PrismaClient | null = null;
 
@@ -36,21 +37,42 @@ export async function closeDatabase(): Promise<void> {
 export async function recoverStuckJobs(): Promise<number> {
   const db = getDatabase();
   const inFlightStatuses = ['DOWNLOADING', 'UPLOADING', 'PROCESSING', 'PUBLISHING'];
+  const config = getConfig();
 
-  const result = await db.uploadJob.updateMany({
+  let resetCount = 0;
+
+  // 1. Reset jobs that were actively processing when server crashed
+  const inFlightResult = await db.uploadJob.updateMany({
     where: {
-      status: {
-        in: inFlightStatuses,
+      status: { in: inFlightStatuses },
+    },
+    data: {
+      status: 'PENDING',
+      processingAt: null,
+    },
+  });
+  resetCount += inFlightResult.count;
+
+  // 2. Recovery for in-memory Retry Queue:
+  // If the server crashed, any FAILED job waiting for backoff timer in memory is lost.
+  // We reset them to PENDING so they are re-queued immediately on boot.
+  const failedResult = await db.uploadJob.updateMany({
+    where: {
+      status: 'FAILED',
+      retryCount: {
+        lt: config.upload.maxRetryAttempts,
       },
     },
     data: {
       status: 'PENDING',
+      processingAt: null,
     },
   });
+  resetCount += failedResult.count;
 
-  if (result.count > 0) {
-    logger.warn(`Queue recovery: reset ${result.count} stuck in-flight job(s) to PENDING`);
+  if (resetCount > 0) {
+    logger.warn(`Queue recovery: reset ${resetCount} stuck/failed job(s) to PENDING`);
   }
 
-  return result.count;
+  return resetCount;
 }

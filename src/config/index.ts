@@ -33,7 +33,11 @@ export function validateConfig(): void {
 
   // Also check that either ACCOUNTS_CONFIG is set, or the legacy vars are set
   if (!process.env.ACCOUNTS_CONFIG) {
-    const legacyVars = ['GOOGLE_DRIVE_FOLDER_ID', 'GOOGLE_DRIVE_UPLOADED_FOLDER_ID', 'INSTAGRAM_ACCOUNT_ID'];
+    const legacyVars = [
+      'GOOGLE_DRIVE_FOLDER_ID',
+      'GOOGLE_DRIVE_UPLOADED_FOLDER_ID',
+      'INSTAGRAM_ACCOUNT_ID',
+    ];
     const missingLegacy = legacyVars.filter((key) => !process.env[key]);
     if (missingLegacy.length > 0) {
       throw new Error(
@@ -47,21 +51,23 @@ function parseAccountsConfig(): AccountMapping[] {
   const accountsStr = process.env.ACCOUNTS_CONFIG;
   if (accountsStr) {
     try {
-      return JSON.parse(accountsStr);
+      return JSON.parse(accountsStr) as AccountMapping[];
     } catch (e) {
       console.error('Failed to parse ACCOUNTS_CONFIG env variable:', e);
       // Fall through to legacy if parse fails
     }
   }
-  
+
   // Fallback to legacy config
-  return [{
-    instagramAccountId: process.env.INSTAGRAM_ACCOUNT_ID ?? '',
-    driveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? '',
-    driveUploadedFolderId: process.env.GOOGLE_DRIVE_UPLOADED_FOLDER_ID ?? '',
-    isNewAccount: process.env.IS_NEW_ACCOUNT === 'true',
-    warmupStartDate: process.env.WARMUP_START_DATE,
-  }];
+  return [
+    {
+      instagramAccountId: process.env.INSTAGRAM_ACCOUNT_ID ?? '',
+      driveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? '',
+      driveUploadedFolderId: process.env.GOOGLE_DRIVE_UPLOADED_FOLDER_ID ?? '',
+      isNewAccount: process.env.IS_NEW_ACCOUNT === 'true',
+      warmupStartDate: process.env.WARMUP_START_DATE,
+    },
+  ];
 }
 
 /**
@@ -110,7 +116,7 @@ export function loadConfig(): Config {
       targetDailyLimit: parseInt(process.env.TARGET_DAILY_LIMIT ?? '32', 10),
       defaultCooldownHours: parseInt(process.env.DEFAULT_COOLDOWN_HOURS ?? '48', 10),
       enableAdaptiveWarmup: process.env.ENABLE_ADAPTIVE_WARMUP !== 'false', // true by default
-      enableHealthScoring: process.env.ENABLE_HEALTH_SCORING !== 'false',   // true by default
+      enableHealthScoring: process.env.ENABLE_HEALTH_SCORING !== 'false', // true by default
       postingWindowStart: process.env.POSTING_WINDOW_START ?? '08:00',
       postingWindowEnd: process.env.POSTING_WINDOW_END ?? '22:00',
     },

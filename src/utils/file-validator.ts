@@ -128,7 +128,8 @@ export function formatBytes(bytes: number): string {
  * Sanitizes a filename to prevent path traversal attacks.
  */
 export function sanitizeFileName(name: string): string {
-  return path.basename(name)
+  return path
+    .basename(name)
     .replace(/[^a-zA-Z0-9._\- ]/g, '_')
     .replace(/\.{2,}/g, '.');
 }

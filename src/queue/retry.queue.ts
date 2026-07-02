@@ -58,7 +58,7 @@ export class RetryQueue {
    */
   start(onRetry: (job: UploadJob, attempt: number) => void): void {
     this.intervalHandle = setInterval(() => {
-      this.processRetries(onRetry).catch((err) => {
+      this.processRetries(onRetry).catch((err: unknown) => {
         logger.error('Error in retry processor', { error: err });
       });
     }, 10_000);

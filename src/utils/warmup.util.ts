@@ -1,12 +1,36 @@
 import { parseISO, isValid } from 'date-fns';
 
 const WARMUP_SCHEDULE = [
-  1, 2, 2, 3, 3, // Days 1-5
-  4, 4, 5, 5, 6, // Days 6-10
-  6, 7, 7, 8, 10, // Days 11-15
-  10, 12, 12, 14, 14, // Days 16-20
-  16, 18, 20, 22, 24, // Days 21-25
-  26, 28, 30, 31, 32, // Days 26-30
+  1,
+  2,
+  2,
+  3,
+  3, // Days 1-5
+  4,
+  4,
+  5,
+  5,
+  6, // Days 6-10
+  6,
+  7,
+  7,
+  8,
+  10, // Days 11-15
+  10,
+  12,
+  12,
+  14,
+  14, // Days 16-20
+  16,
+  18,
+  20,
+  22,
+  24, // Days 21-25
+  26,
+  28,
+  30,
+  31,
+  32, // Days 26-30
 ];
 
 /**
@@ -20,17 +44,21 @@ export function calculateWarmupDay(startDateStr?: string): number {
   // Append 'T00:00:00Z' if it's just a date string, forcing strict UTC parsing
   const isoStr = startDateStr.includes('T') ? startDateStr : `${startDateStr}T00:00:00Z`;
   const startDate = parseISO(isoStr);
-  
+
   if (!isValid(startDate)) return 1;
 
   const now = new Date();
-  
+
   // Strip time from both dates to compare purely on UTC days
-  const startUtc = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate());
+  const startUtc = Date.UTC(
+    startDate.getUTCFullYear(),
+    startDate.getUTCMonth(),
+    startDate.getUTCDate(),
+  );
   const nowUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 
   const daysDiff = Math.floor((nowUtc - startUtc) / (1000 * 60 * 60 * 24));
-  
+
   return daysDiff < 0 ? 1 : daysDiff + 1;
 }
 

@@ -2,7 +2,6 @@ import { getConfig } from '../config';
 import { getUploadQueue } from '../queue/upload.queue';
 import { getRetryQueue } from '../queue/retry.queue';
 import { getUploadWorker } from './upload.worker';
-import { UploadJobModel } from '../database/repository';
 import { UploadJob } from '../types/upload.types';
 import { BatchSummary } from '../types/upload.types';
 import { getNotificationService } from '../services/notification.service';
@@ -64,19 +63,14 @@ export class DownloadWorker {
     });
 
     // ── Retry queue: re-submit failed jobs back into the sequential loop ─────
-    retryQueue.start(async (job: UploadJob, attempt: number) => {
+    retryQueue.start((job: UploadJob, attempt: number) => {
       logger.info('Retry triggered for job — re-queuing into sequential processor', {
         jobId: job.id,
         attempt,
         fileName: job.driveFileName,
       });
-      // Reset status to PENDING so the queue picks it up
-      try {
-        await UploadJobModel.update(job.id, { status: 'PENDING' });
-        void this.triggerNextJob();
-      } catch (err) {
-        logger.error('Failed to reset job for retry', { error: err });
-      }
+      // The retry queue already reset the status to PENDING
+      void this.triggerNextJob();
     });
 
     logger.info('DownloadWorker started — sequential mode with delay', {
@@ -174,13 +168,16 @@ export class DownloadWorker {
           batchFailed++;
 
           if (processResult.restrictAccount && currentJob.instagramAccountId) {
-            logger.warn('Account is restricted by Meta API — skipping retries and canceling pending jobs', {
-              jobId: currentJob.id,
-              accountId: currentJob.instagramAccountId,
-            });
+            logger.warn(
+              'Account is restricted by Meta API — skipping retries and canceling pending jobs',
+              {
+                jobId: currentJob.id,
+                accountId: currentJob.instagramAccountId,
+              },
+            );
             await queue.cancelJobsForAccount(
               currentJob.instagramAccountId,
-              'Account restricted by Meta API'
+              'Account restricted by Meta API',
             );
           } else if (currentJob.retryCount < getConfig().upload.maxRetryAttempts) {
             // REQ-5: Schedule retry if under the limit; continue either way

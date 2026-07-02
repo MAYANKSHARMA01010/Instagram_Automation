@@ -32,14 +32,17 @@ export class UploadWorker {
 
   constructor() {
     // Periodically clean up expired cache entries to prevent memory leaks
-    setInterval(() => {
-      const now = Date.now();
-      for (const [key, value] of this.assetCache.entries()) {
-        if (value.expiresAt < now) {
-          this.assetCache.delete(key);
+    setInterval(
+      () => {
+        const now = Date.now();
+        for (const [key, value] of this.assetCache.entries()) {
+          if (value.expiresAt < now) {
+            this.assetCache.delete(key);
+          }
         }
-      }
-    }, 60 * 60 * 1000).unref(); // Run every 1 hour, don't block event loop exit
+      },
+      60 * 60 * 1000,
+    ).unref(); // Run every 1 hour, don't block event loop exit
   }
 
   /**
@@ -139,11 +142,17 @@ export class UploadWorker {
         try {
           const captionFile = await driveService.findCaptionFile(sourceFolderId);
           if (captionFile) {
-            const downloadResult = await driveService.downloadFile(captionFile.id, captionFile.name);
+            const downloadResult = await driveService.downloadFile(
+              captionFile.id,
+              captionFile.name,
+            );
             const downloadedText = await fs.promises.readFile(downloadResult.filePath, 'utf-8');
             if (downloadedText.trim()) {
               caption = downloadedText.trim();
-              logger.info('Using dynamic caption from Google Drive', { sourceFolderId, length: caption.length });
+              logger.info('Using dynamic caption from Google Drive', {
+                sourceFolderId,
+                length: caption.length,
+              });
             }
             // Clean up the temp caption file asynchronously
             try {
@@ -167,13 +176,19 @@ export class UploadWorker {
             const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
             const coverFileName = downloadResult.filePath.split('/').pop();
             coverUrl = `${host}/public/tmp/${coverFileName}`;
-            logger.info('Using dynamic cover image from Google Drive', { coverUrl, sourceFolderId });
+            logger.info('Using dynamic cover image from Google Drive', {
+              coverUrl,
+              sourceFolderId,
+            });
           }
         } catch (coverErr) {
-          logger.warn('Could not download dynamic cover image — proceeding without or with fallback', {
-            sourceFolderId,
-            error: coverErr instanceof Error ? coverErr.message : String(coverErr),
-          });
+          logger.warn(
+            'Could not download dynamic cover image — proceeding without or with fallback',
+            {
+              sourceFolderId,
+              error: coverErr instanceof Error ? coverErr.message : String(coverErr),
+            },
+          );
         }
 
         // Cache the fetched assets
@@ -220,7 +235,12 @@ export class UploadWorker {
 
       let container;
       try {
-        container = await instagramService.createReelContainer(accountId, videoUrl, caption, coverUrl);
+        container = await instagramService.createReelContainer(
+          accountId,
+          videoUrl,
+          caption,
+          coverUrl,
+        );
       } catch (containerErr) {
         // REQ-3: If container creation with cover fails, retry without cover
         if (
@@ -231,7 +251,12 @@ export class UploadWorker {
           logger.warn('Container creation with cover failed — retrying without cover', {
             error: containerErr.message,
           });
-          container = await instagramService.createReelContainer(accountId, videoUrl, caption, undefined);
+          container = await instagramService.createReelContainer(
+            accountId,
+            videoUrl,
+            caption,
+            undefined,
+          );
         } else {
           throw containerErr;
         }
@@ -272,7 +297,8 @@ export class UploadWorker {
 
       // ── Step 7: Move file to Uploaded folder in Drive ───────────────────────
       t0 = Date.now();
-      const uploadedFolderId = job.uploadedDriveFolderId ?? this.config.google.driveUploadedFolderId;
+      const uploadedFolderId =
+        job.uploadedDriveFolderId ?? this.config.google.driveUploadedFolderId;
       await driveService.moveToUploaded(job.driveFileId, job.driveFileName, uploadedFolderId);
       stageTimings.driveMove = Date.now() - t0;
 
@@ -330,7 +356,7 @@ export class UploadWorker {
 
       const statisticsService = getStatisticsService();
       statisticsService.recordSuccess(stageTimings, job.retryCount, accountId);
-      
+
       await getHealthService().recordSuccess(accountId);
 
       return { success: true };
@@ -339,8 +365,8 @@ export class UploadWorker {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      const isRestricted = 
-        errorMessage.includes('User access is restricted') || 
+      const isRestricted =
+        errorMessage.includes('User access is restricted') ||
         (httpStatus === 400 && errorMessage.includes('Meta API Error'));
 
       await this.failJob(
@@ -379,7 +405,11 @@ export class UploadWorker {
     const durationMs = elapsedMs(uploadStartTime);
 
     const statisticsService = getStatisticsService();
-    statisticsService.recordFailure(job.retryCount, errorMessage, job.instagramAccountId ?? undefined);
+    statisticsService.recordFailure(
+      job.retryCount,
+      errorMessage,
+      job.instagramAccountId ?? undefined,
+    );
 
     if (job.instagramAccountId) {
       await getHealthService().recordFailure(job.instagramAccountId, errorMessage);

@@ -19,7 +19,7 @@ export class UploadQueue extends EventEmitter {
   async enqueue(
     driveFile: DriveFile,
     instagramAccountId: string,
-    uploadedDriveFolderId: string
+    uploadedDriveFolderId: string,
   ): Promise<UploadJob | null> {
     // Double-check for duplicates
     if (await ProcessedFileModel.isProcessed(driveFile.id)) {
@@ -41,7 +41,9 @@ export class UploadQueue extends EventEmitter {
     });
 
     if (!job) {
-      logger.debug('Job insertion failed (unique constraint), duplicate prevented', { fileId: driveFile.id });
+      logger.debug('Job insertion failed (unique constraint), duplicate prevented', {
+        fileId: driveFile.id,
+      });
       return null;
     }
 
@@ -58,7 +60,7 @@ export class UploadQueue extends EventEmitter {
     driveFileId: string,
     driveFileName: string,
     instagramAccountId: string,
-    uploadedDriveFolderId: string
+    uploadedDriveFolderId: string,
   ): Promise<UploadJob> {
     const job = await UploadJobModel.createSafe({
       driveFileId,
@@ -182,7 +184,7 @@ export class UploadQueue extends EventEmitter {
   async cancelJobsForAccount(accountId: string, reason: string): Promise<number> {
     const pendingJobs = await UploadJobModel.findByStatus('PENDING');
     const jobsToCancel = pendingJobs.filter(
-      (j) => j.instagramAccountId === accountId && !this.processingSet.has(j.id)
+      (j) => j.instagramAccountId === accountId && !this.processingSet.has(j.id),
     );
 
     let canceledCount = 0;

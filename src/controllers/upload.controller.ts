@@ -55,7 +55,7 @@ export async function enqueueFile(req: Request, res: Response): Promise<void> {
       fileMetadata.id,
       fileMetadata.name,
       defaultAccount.instagramAccountId,
-      defaultAccount.driveUploadedFolderId
+      defaultAccount.driveUploadedFolderId,
     );
 
     res.json({

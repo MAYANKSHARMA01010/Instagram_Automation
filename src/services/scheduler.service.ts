@@ -90,7 +90,9 @@ export class SchedulerService {
         await getNotificationService().notifyTokenExpirySoon(0, expiryDate);
       }
     } catch (err) {
-      logger.warn('Could not check token expiry', { error: err instanceof Error ? err.message : String(err) });
+      logger.warn('Could not check token expiry', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -119,7 +121,10 @@ export class SchedulerService {
         const accountId = account.instagramAccountId;
 
         // ── 1. Check Cooldown ──
-        if (this.config.upload.enableHealthScoring && await healthService.checkCooldown(accountId)) {
+        if (
+          this.config.upload.enableHealthScoring &&
+          (await healthService.checkCooldown(accountId))
+        ) {
           logger.info('Account is in cooldown, skipping poll', { accountId });
           continue;
         }
@@ -135,11 +140,11 @@ export class SchedulerService {
           const targetLimit = account.targetDailyLimit ?? this.config.upload.targetDailyLimit;
           const day = calculateWarmupDay(account.warmupStartDate);
           let baseLimit = getWarmupLimit(day, targetLimit);
-          
+
           if (isAdaptiveEnabled && this.config.upload.enableHealthScoring) {
             const health = await healthService.getHealth(accountId);
             const band = healthService.getHealthBand(health.healthScore);
-            
+
             if (health.healthScore < 50) {
               // Post-cooldown or critical recovery: strictly clamp limit to 25%
               baseLimit = Math.max(1, Math.floor(baseLimit * 0.25));
@@ -151,7 +156,7 @@ export class SchedulerService {
             }
           }
           todayLimit = baseLimit;
-          
+
           // The strict global daily limit always overrides the target warm-up limit if set lower.
           if (this.config.upload.dailyUploadLimit > 0) {
             todayLimit = Math.min(todayLimit, this.config.upload.dailyUploadLimit);
@@ -159,15 +164,17 @@ export class SchedulerService {
         }
 
         // ── 3. Calculate Distribution (Pacing) ──
-        const windowStartStr = account.postingWindowStart ?? this.config.upload.postingWindowStart ?? '00:00';
-        const windowEndStr = account.postingWindowEnd ?? this.config.upload.postingWindowEnd ?? '23:59';
-        
+        const windowStartStr =
+          account.postingWindowStart ?? this.config.upload.postingWindowStart ?? '00:00';
+        const windowEndStr =
+          account.postingWindowEnd ?? this.config.upload.postingWindowEnd ?? '23:59';
+
         const now = new Date();
         const todayStart = startOfDay(now);
-        
+
         let windowStart = parse(windowStartStr, 'HH:mm', todayStart);
         let windowEnd = parse(windowEndStr, 'HH:mm', todayStart);
-        
+
         // If window crosses midnight (e.g. 20:00 to 08:00)
         if (windowEnd <= windowStart) {
           if (now < windowEnd) {
@@ -195,9 +202,13 @@ export class SchedulerService {
         const inQueue = await queue.countPendingForAccount(accountId);
 
         // Limit reached for the day
-        if (todayLimit > 0 && (uploadedToday + inQueue >= todayLimit)) {
+        if (todayLimit > 0 && uploadedToday + inQueue >= todayLimit) {
           if (inQueue === 0 && uploadedToday === todayLimit) {
-            logger.info('Daily upload limit reached for account', { accountId, uploadedToday, todayLimit });
+            logger.info('Daily upload limit reached for account', {
+              accountId,
+              uploadedToday,
+              todayLimit,
+            });
             // Only notify if we exactly just hit it to avoid spam, though state tracking would be better.
             // For now, it will just quietly skip.
           }
@@ -205,13 +216,20 @@ export class SchedulerService {
         }
 
         // Pacing limit reached
-        if (todayLimit > 0 && (uploadedToday + inQueue >= expectedUploads)) {
-          logger.debug('Upload pacing active: ahead of schedule', { accountId, uploadedToday, inQueue, expectedUploads, todayLimit });
+        if (todayLimit > 0 && uploadedToday + inQueue >= expectedUploads) {
+          logger.debug('Upload pacing active: ahead of schedule', {
+            accountId,
+            uploadedToday,
+            inQueue,
+            expectedUploads,
+            todayLimit,
+          });
           continue;
         }
 
         // Calculate how many we are allowed to enqueue right now
-        const allowedToEnqueue = todayLimit > 0 ? (expectedUploads - (uploadedToday + inQueue)) : Infinity;
+        const allowedToEnqueue =
+          todayLimit > 0 ? expectedUploads - (uploadedToday + inQueue) : Infinity;
         if (allowedToEnqueue <= 0) continue;
 
         // ── 4. Fetch from Drive ──
@@ -245,7 +263,11 @@ export class SchedulerService {
           const job = await queue.enqueue(file, accountId, account.driveUploadedFolderId);
           if (job) {
             enqueued++;
-            logger.info('Enqueued file for upload', { fileId: file.id, name: file.name, accountId });
+            logger.info('Enqueued file for upload', {
+              fileId: file.id,
+              name: file.name,
+              accountId,
+            });
           } else {
             skipped++;
           }
@@ -264,7 +286,7 @@ export class SchedulerService {
           uploadedToday,
           inQueue,
           postingWindowStart: windowStartStr,
-          postingWindowEnd: windowEndStr
+          postingWindowEnd: windowEndStr,
         };
 
         if (enqueued > 0) {
@@ -289,7 +311,6 @@ export class SchedulerService {
       }
 
       logger.info('Overall poll cycle complete', { totalEnqueued, totalSkipped });
-
     } catch (error) {
       logger.error('Drive poll cycle failed', {
         error: error instanceof Error ? error.message : String(error),

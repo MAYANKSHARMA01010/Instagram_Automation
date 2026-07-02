@@ -83,7 +83,7 @@ export interface AccountMapping {
   maximumDailyLimit?: number;
   cooldownHours?: number;
   postingWindowStart?: string; // e.g. "08:00"
-  postingWindowEnd?: string;   // e.g. "20:00"
+  postingWindowEnd?: string; // e.g. "20:00"
 }
 
 export interface Config {

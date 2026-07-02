@@ -68,9 +68,9 @@ export class NotificationService {
     if (!this.isConfigured()) return;
 
     const startStr = payload.startTime.toUTCString();
-    
-    let header = '▶️ *Upload Started*';
-    const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
+
+    const header = '▶️ *Upload Started*';
+    const account = this.config.accounts.find((a) => a.instagramAccountId === payload.accountId);
 
     const message = [
       header,
@@ -100,8 +100,8 @@ export class NotificationService {
     const startTime = new Date(Date.now() - payload.uploadTimeMs).toUTCString();
     const stats = getStatisticsService().getDailySummary();
 
-    let header = '✅ *Reel Uploaded Successfully*';
-    const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
+    const header = '✅ *Reel Uploaded Successfully*';
+    const account = this.config.accounts.find((a) => a.instagramAccountId === payload.accountId);
 
     const message = [
       header,
@@ -138,8 +138,8 @@ export class NotificationService {
     const stats = getStatisticsService().getDailySummary();
     const errorCategory = getStatisticsService().categoriseError(payload.reason);
 
-    let header = '❌ *Reel Upload Failed*';
-    const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
+    const header = '❌ *Reel Upload Failed*';
+    const account = this.config.accounts.find((a) => a.instagramAccountId === payload.accountId);
 
     const message = [
       header,
@@ -187,11 +187,13 @@ export class NotificationService {
     // Build per-account breakdown
     let accountBreakdownLine = '';
     if (stats.accountSummaries.length > 0) {
-      const lines = stats.accountSummaries.map(a => {
-        const avgSec = a.uploads > 0 ? Math.round(a.totalUploadMs / a.uploads / 1000) : 0;
-        const statusIcon = a.failures > 0 ? '⚠️' : '✅';
-        return `  ${statusIcon} *${this.esc(a.accountName)}* (\`${a.instagramAccountId}\`): ${a.uploads} uploaded, ${a.failures} failed, ${a.metaApiCalls} API calls, avg ${avgSec}s`;
-      }).join('\n');
+      const lines = stats.accountSummaries
+        .map((a) => {
+          const avgSec = a.uploads > 0 ? Math.round(a.totalUploadMs / a.uploads / 1000) : 0;
+          const statusIcon = a.failures > 0 ? '⚠️' : '✅';
+          return `  ${statusIcon} *${this.esc(a.accountName)}* (\`${a.instagramAccountId}\`): ${a.uploads} uploaded, ${a.failures} failed, ${a.metaApiCalls} API calls, avg ${avgSec}s`;
+        })
+        .join('\n');
       accountBreakdownLine = `\n\n👥 *Per-Account Breakdown:*\n${lines}`;
     }
 
@@ -235,11 +237,13 @@ export class NotificationService {
     // Per-account breakdown
     let accountBreakdownLine = '';
     if (stats.accountSummaries.length > 0) {
-      const lines = stats.accountSummaries.map(a => {
-        const avgSec = a.uploads > 0 ? Math.round(a.totalUploadMs / a.uploads / 1000) : 0;
-        const statusIcon = a.failures > 0 ? '⚠️' : '✅';
-        return `  ${statusIcon} *${this.esc(a.accountName)}* (\`${a.instagramAccountId}\`)\n     📤 Uploaded: ${a.uploads} | ❌ Failed: ${a.failures} | 🌐 API Calls: ${a.metaApiCalls} | ⚡ Avg: ${avgSec}s`;
-      }).join('\n');
+      const lines = stats.accountSummaries
+        .map((a) => {
+          const avgSec = a.uploads > 0 ? Math.round(a.totalUploadMs / a.uploads / 1000) : 0;
+          const statusIcon = a.failures > 0 ? '⚠️' : '✅';
+          return `  ${statusIcon} *${this.esc(a.accountName)}* (\`${a.instagramAccountId}\`)\n     📤 Uploaded: ${a.uploads} | ❌ Failed: ${a.failures} | 🌐 API Calls: ${a.metaApiCalls} | ⚡ Avg: ${avgSec}s`;
+        })
+        .join('\n');
       accountBreakdownLine = `\n\n👥 *Per-Account Breakdown:*\n${lines}`;
     }
 
@@ -267,20 +271,23 @@ export class NotificationService {
   async notifyStartup(): Promise<void> {
     if (!this.isConfigured()) return;
 
-    const accountLines = this.config.accounts.map((a, i) =>
-      `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`)`
-    ).join('\n');
+    const accountLines = this.config.accounts
+      .map(
+        (a, i) =>
+          `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`)`,
+      )
+      .join('\n');
 
     const dailyLimit = this.config.upload.dailyUploadLimit;
     const limitLine = dailyLimit > 0 ? `${dailyLimit} videos/day` : 'Unlimited';
 
     await this.sendMessage(
       `🚀 *Instagram Reels Uploader Started*\n\n` +
-      `The automation system is online and monitoring Google Drive.\n\n` +
-      `👥 *Active Accounts (${this.config.accounts.length}):*\n${accountLines}\n\n` +
-      `⏱ *Upload Delay:* ${this.config.upload.uploadDelaySeconds}s between uploads\n` +
-      `📊 *Daily Limit:* ${limitLine}\n` +
-      `🔄 *Poll Interval:* ${this.config.upload.pollingCron}`
+        `The automation system is online and monitoring Google Drive.\n\n` +
+        `👥 *Active Accounts (${this.config.accounts.length}):*\n${accountLines}\n\n` +
+        `⏱ *Upload Delay:* ${this.config.upload.uploadDelaySeconds}s between uploads\n` +
+        `📊 *Daily Limit:* ${limitLine}\n` +
+        `🔄 *Poll Interval:* ${this.config.upload.pollingCron}`,
     );
   }
 
@@ -293,24 +300,28 @@ export class NotificationService {
     const urgencyEmoji = daysLeft <= 3 ? '🚨' : '⚠️';
     await this.sendMessage(
       `${urgencyEmoji} *Graph API Token Expiring Soon!*\n\n` +
-      `Your Meta Graph API token will expire in *${daysLeft} day(s)* on *${expiryDate}*.\n\n` +
-      `If you don't renew it, ALL uploads will stop failing with an Auth Error!\n\n` +
-      `*To renew:* Go to Meta for Developers → Tools → Graph API Explorer → Generate new long-lived token, then update \`GRAPH_API_TOKEN\` in your Render environment variables.`
+        `Your Meta Graph API token will expire in *${daysLeft} day(s)* on *${expiryDate}*.\n\n` +
+        `If you don't renew it, ALL uploads will stop failing with an Auth Error!\n\n` +
+        `*To renew:* Go to Meta for Developers → Tools → Graph API Explorer → Generate new long-lived token, then update \`GRAPH_API_TOKEN\` in your Render environment variables.`,
     );
   }
 
   /**
    * Sent when the daily upload limit is reached for an account.
    */
-  async notifyDailyLimitReached(accountName: string, accountId: string, limit: number): Promise<void> {
+  async notifyDailyLimitReached(
+    accountName: string,
+    accountId: string,
+    limit: number,
+  ): Promise<void> {
     if (!this.isConfigured()) return;
 
     await this.sendMessage(
       `🛑 *Daily Upload Limit Reached*\n\n` +
-      `👤 *Account:* ${this.esc(accountName)} (\`${accountId}\`)\n` +
-      `📊 *Daily Limit:* ${limit} videos\n\n` +
-      `The bot will automatically resume uploading for this account tomorrow (after midnight UTC / 5:30 AM IST).\n\n` +
-      `To change the limit, update \`DAILY_UPLOAD_LIMIT\` in your Render environment variables.`
+        `👤 *Account:* ${this.esc(accountName)} (\`${accountId}\`)\n` +
+        `📊 *Daily Limit:* ${limit} videos\n\n` +
+        `The bot will automatically resume uploading for this account tomorrow (after midnight UTC / 5:30 AM IST).\n\n` +
+        `To change the limit, update \`DAILY_UPLOAD_LIMIT\` in your Render environment variables.`,
     );
   }
 
@@ -322,9 +333,9 @@ export class NotificationService {
 
     await this.sendMessage(
       `⚠️ *Large Upload Queue Detected*\n\n` +
-      `📦 *Queue Size:* ${queueSize} videos (threshold: ${threshold})\n\n` +
-      `This usually means many videos were added to Google Drive at once. The bot will process them one by one with the configured delay.\n\n` +
-      `⏱ *Estimated completion:* ~${Math.round(queueSize * this.config.upload.uploadDelaySeconds / 60)} minutes`
+        `📦 *Queue Size:* ${queueSize} videos (threshold: ${threshold})\n\n` +
+        `This usually means many videos were added to Google Drive at once. The bot will process them one by one with the configured delay.\n\n` +
+        `⏱ *Estimated completion:* ~${Math.round((queueSize * this.config.upload.uploadDelaySeconds) / 60)} minutes`,
     );
   }
 
@@ -334,10 +345,10 @@ export class NotificationService {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `🌱 *Warm-up Started*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n` +
-      `📅 *Day:* ${day} of 30\n` +
-      `📈 *Today's Limit:* ${limit} videos\n\n` +
-      `Uploads will be spaced out naturally throughout your configured posting window.`
+        `👤 *Account:* \`${accountId}\`\n` +
+        `📅 *Day:* ${day} of 30\n` +
+        `📈 *Today's Limit:* ${limit} videos\n\n` +
+        `Uploads will be spaced out naturally throughout your configured posting window.`,
     );
   }
 
@@ -345,8 +356,8 @@ export class NotificationService {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `🎉 *Warm-up Completed!*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n\n` +
-      `This account has successfully survived the 30-day warm-up period. Target limits are now unlocked.`
+        `👤 *Account:* \`${accountId}\`\n\n` +
+        `This account has successfully survived the 30-day warm-up period. Target limits are now unlocked.`,
     );
   }
 
@@ -354,10 +365,10 @@ export class NotificationService {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `🚨 *CRITICAL: Account in Cooldown*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n` +
-      `💔 *Health Score:* ${score}/100 (Critical)\n` +
-      `⏸️ *Action:* Halting all uploads for ${hours} hours.\n\n` +
-      `The bot will automatically resume after the cooldown expires.`
+        `👤 *Account:* \`${accountId}\`\n` +
+        `💔 *Health Score:* ${score}/100 (Critical)\n` +
+        `⏸️ *Action:* Halting all uploads for ${hours} hours.\n\n` +
+        `The bot will automatically resume after the cooldown expires.`,
     );
   }
 
@@ -365,30 +376,40 @@ export class NotificationService {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `🟢 *Cooldown Expired*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n` +
-      `💔 *Health Score:* ${score}/100\n\n` +
-      `Resuming uploads cautiously.`
+        `👤 *Account:* \`${accountId}\`\n` +
+        `💔 *Health Score:* ${score}/100\n\n` +
+        `Resuming uploads cautiously.`,
     );
   }
 
-  async notifyHealthDegraded(accountId: string, oldBand: string, newBand: string, score: number): Promise<void> {
+  async notifyHealthDegraded(
+    accountId: string,
+    oldBand: string,
+    newBand: string,
+    score: number,
+  ): Promise<void> {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `📉 *Health Score Degraded*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n` +
-      `💔 *Score:* ${score}/100\n` +
-      `🚦 *Band:* ${oldBand} ➡️ ${newBand}\n\n` +
-      `Action blocked or checkpoint detected. Proceeding with extreme caution.`
+        `👤 *Account:* \`${accountId}\`\n` +
+        `💔 *Score:* ${score}/100\n` +
+        `🚦 *Band:* ${oldBand} ➡️ ${newBand}\n\n` +
+        `Action blocked or checkpoint detected. Proceeding with extreme caution.`,
     );
   }
 
-  async notifyHealthRecovered(accountId: string, oldBand: string, newBand: string, score: number): Promise<void> {
+  async notifyHealthRecovered(
+    accountId: string,
+    oldBand: string,
+    newBand: string,
+    score: number,
+  ): Promise<void> {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `📈 *Health Score Recovered*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n` +
-      `💚 *Score:* ${score}/100\n` +
-      `🚦 *Band:* ${oldBand} ➡️ ${newBand}`
+        `👤 *Account:* \`${accountId}\`\n` +
+        `💚 *Score:* ${score}/100\n` +
+        `🚦 *Band:* ${oldBand} ➡️ ${newBand}`,
     );
   }
 
@@ -396,9 +417,9 @@ export class NotificationService {
     if (!this.isConfigured()) return;
     await this.sendMessage(
       `⚠️ *Platform Restriction Detected*\n\n` +
-      `👤 *Account:* \`${accountId}\`\n` +
-      `💬 *Details:* ${this.esc(errorMessage)}\n\n` +
-      `Heavy penalty applied to health score.`
+        `👤 *Account:* \`${accountId}\`\n` +
+        `💬 *Details:* ${this.esc(errorMessage)}\n\n` +
+        `Heavy penalty applied to health score.`,
     );
   }
 

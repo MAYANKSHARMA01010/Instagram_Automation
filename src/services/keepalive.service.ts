@@ -15,14 +15,16 @@ export class KeepAliveService {
   start(): void {
     if (this.intervalHandle) return;
 
-    this.intervalHandle = setInterval(async () => {
-      try {
-        await getDatabase().$queryRaw`SELECT 1`;
-      } catch (error) {
-        logger.warn('Database keepalive failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    this.intervalHandle = setInterval(() => {
+      void (async (): Promise<void> => {
+        try {
+          await getDatabase().$queryRaw`SELECT 1`;
+        } catch (error) {
+          logger.warn('Database keepalive failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      })();
     }, this.INTERVAL_MS);
 
     logger.info('Database KeepAliveService started');

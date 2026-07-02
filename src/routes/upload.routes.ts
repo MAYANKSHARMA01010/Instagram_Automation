@@ -38,30 +38,40 @@ router.post(
  * @route  GET /api/upload/jobs
  * @desc   List upload jobs (optional ?status= filter)
  */
-router.get('/jobs', getJobs);
+router.get('/jobs', (req, res) => {
+  void getJobs(req, res);
+});
 
 /**
  * @route  GET /api/upload/jobs/:id
  * @desc   Get a specific upload job by ID
  */
-router.get('/jobs/:id', getJobById);
+router.get('/jobs/:id', (req, res) => {
+  void getJobById(req, res);
+});
 
 /**
  * @route  GET /api/upload/logs
  * @desc   Get upload history logs
  */
-router.get('/logs', getUploadLogs);
+router.get('/logs', (req, res) => {
+  void getUploadLogs(req, res);
+});
 
 /**
  * @route  GET /api/upload/processed
  * @desc   Get list of processed (uploaded) Drive files
  */
-router.get('/processed', getProcessedFiles);
+router.get('/processed', (req, res) => {
+  void getProcessedFiles(req, res);
+});
 
 /**
  * @route  GET /api/upload/stats
  * @desc   Get queue statistics
  */
-router.get('/stats', getStats);
+router.get('/stats', (req, res) => {
+  void getStats(req, res);
+});
 
 export default router;

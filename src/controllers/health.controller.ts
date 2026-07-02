@@ -98,8 +98,9 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
         retries: dailyStats.retriesToday,
       },
       queue: queueStats,
-      dailyLimit: config.upload.dailyUploadLimit === 0 ? 'unlimited' : config.upload.dailyUploadLimit,
-      accounts: dailyStats.accountSummaries.map(a => ({
+      dailyLimit:
+        config.upload.dailyUploadLimit === 0 ? 'unlimited' : config.upload.dailyUploadLimit,
+      accounts: dailyStats.accountSummaries.map((a) => ({
         name: a.accountName,
         id: a.instagramAccountId,
         uploadedToday: a.uploads,

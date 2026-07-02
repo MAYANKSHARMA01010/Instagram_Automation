@@ -15,12 +15,12 @@ export function getOAuth2Client(): Auth.OAuth2Client {
       'urn:ietf:wg:oauth:2.0:oob',
     );
 
-    oauth2Client!.setCredentials({
+    oauth2Client.setCredentials({
       refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
     });
 
     // Listen for token refresh events
-    oauth2Client!.on('tokens', (tokens: Auth.Credentials) => {
+    oauth2Client.on('tokens', (tokens: Auth.Credentials) => {
       if (tokens.expiry_date) {
         tokenExpiryTime = tokens.expiry_date;
         logger.info('Google OAuth token refreshed', {
@@ -30,7 +30,7 @@ export function getOAuth2Client(): Auth.OAuth2Client {
     });
   }
 
-  return oauth2Client!;
+  return oauth2Client;
 }
 
 /**

@@ -29,7 +29,7 @@ export async function handleN8nUpload(req: Request, res: Response): Promise<void
       driveFileId,
       driveFileName,
       defaultAccount.instagramAccountId,
-      defaultAccount.driveUploadedFolderId
+      defaultAccount.driveUploadedFolderId,
     );
 
     res.json({

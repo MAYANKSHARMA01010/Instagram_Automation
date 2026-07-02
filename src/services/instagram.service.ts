@@ -30,8 +30,9 @@ export class InstagramService {
 
     // Add token to all requests
     this.client.interceptors.request.use((config) => {
+      const params = (config.params || {}) as Record<string, unknown>;
       config.params = {
-        ...config.params,
+        ...params,
         access_token: this.config.instagram.graphApiToken,
       };
       return config;
@@ -97,11 +98,12 @@ export class InstagramService {
 
           logger.info('Reel container created', { containerId: response.data.id });
           return response.data;
-        } catch (error: any) {
-          if (error.response?.data?.error?.message) {
-            error.message = `${error.message} - Meta API Error: ${error.response.data.error.message}`;
+        } catch (err: unknown) {
+          const axiosErr = err as AxiosError<GraphApiErrorResponse>;
+          if (axiosErr.response?.data?.error?.message) {
+            axiosErr.message = `${axiosErr.message} - Meta API Error: ${axiosErr.response.data.error.message}`;
           }
-          throw error;
+          throw axiosErr;
         }
       },
       {
@@ -190,11 +192,12 @@ export class InstagramService {
           });
 
           return response.data;
-        } catch (error: any) {
-          if (error.response?.data?.error?.message) {
-            error.message = `${error.message} - Meta API Error: ${error.response.data.error.message}`;
+        } catch (err: unknown) {
+          const axiosErr = err as AxiosError<GraphApiErrorResponse>;
+          if (axiosErr.response?.data?.error?.message) {
+            axiosErr.message = `${axiosErr.message} - Meta API Error: ${axiosErr.response.data.error.message}`;
           }
-          throw error;
+          throw axiosErr;
         }
       },
       {

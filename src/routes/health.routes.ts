@@ -15,6 +15,8 @@ router.get('/', (req, res) => {
  * @route  GET /health/queue
  * @desc   Queue statistics (public)
  */
-router.get('/queue', queueStats);
+router.get('/queue', (req, res) => {
+  void queueStats(req, res);
+});
 
 export default router;
