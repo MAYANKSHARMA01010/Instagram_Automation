@@ -22,6 +22,8 @@ export interface InstagramConfig {
   facebookPageId: string;
   graphApiToken: string;
   graphApiVersion: string;
+  /** ISO date string (YYYY-MM-DD) of when the Graph API token expires */
+  tokenExpiryDate?: string;
 }
 
 export interface ContentConfig {
@@ -39,6 +41,10 @@ export interface UploadConfig {
   statusPollTimeoutMs: number;
   /** Seconds to wait between sequential uploads (default: 120) */
   uploadDelaySeconds: number;
+  /** Max uploads per day across all accounts. 0 = unlimited */
+  dailyUploadLimit: number;
+  /** Send a Telegram warning if queue grows beyond this size */
+  largeQueueWarningThreshold: number;
 }
 
 export interface DatabaseConfig {

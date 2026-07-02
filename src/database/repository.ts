@@ -108,6 +108,62 @@ export const UploadLogModel = {
   },
 
   /**
+   * Returns the count of successfully completed uploads today for a specific account (UTC).
+   */
+  async countTodaySuccessByAccount(instagramAccountId: string): Promise<number> {
+    const db = getDatabase();
+
+    const now = new Date();
+    const startOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const endOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+    );
+
+    const count = await db.uploadLog.count({
+      where: {
+        status: 'COMPLETED',
+        instagramAccountId,
+        createdAt: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+      },
+    });
+    return count;
+  },
+
+  /**
+   * Returns true if a file with the given name was already uploaded today for a given account.
+   * Used to prevent re-uploading same-named videos on the same day across multiple accounts.
+   */
+  async wasUploadedTodayByName(driveFileName: string, instagramAccountId: string): Promise<boolean> {
+    const db = getDatabase();
+
+    const now = new Date();
+    const startOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const endOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+    );
+
+    const count = await db.uploadLog.count({
+      where: {
+        status: 'COMPLETED',
+        driveFileName,
+        instagramAccountId,
+        createdAt: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+      },
+    });
+    return count > 0;
+  },
+
+  /**
    * Returns the count of upload logs matching a given status.
    */
   async countByStatus(status: UploadStatus): Promise<number> {

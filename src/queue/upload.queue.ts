@@ -154,6 +154,19 @@ export class UploadQueue extends EventEmitter {
   }
 
   /**
+   * Returns the count of PENDING jobs for a specific Instagram account.
+   * Used by the daily limit guard to avoid over-enqueuing.
+   */
+  async countPendingForAccount(instagramAccountId: string): Promise<number> {
+    return getDatabase().uploadJob.count({
+      where: {
+        status: 'PENDING',
+        instagramAccountId,
+      },
+    });
+  }
+
+  /**
    * Cancels all pending jobs for a specific account.
    * This is useful when an account hits rate limits or gets restricted.
    */

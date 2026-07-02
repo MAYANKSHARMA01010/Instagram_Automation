@@ -262,14 +262,69 @@ export class NotificationService {
   // ─── System Notifications ────────────────────────────────────────────────
 
   /**
-   * Sent when the server starts up.
+   * Sent when the server starts up — now includes account list and config summary.
    */
   async notifyStartup(): Promise<void> {
     if (!this.isConfigured()) return;
 
+    const accountLines = this.config.accounts.map((a, i) =>
+      `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`)`
+    ).join('\n');
+
+    const dailyLimit = this.config.upload.dailyUploadLimit;
+    const limitLine = dailyLimit > 0 ? `${dailyLimit} videos/day` : 'Unlimited';
+
     await this.sendMessage(
-      '🚀 *Instagram Reels Uploader Started*\n\n' +
-        'The automation system is online and monitoring Google Drive.',
+      `🚀 *Instagram Reels Uploader Started*\n\n` +
+      `The automation system is online and monitoring Google Drive.\n\n` +
+      `👥 *Active Accounts (${this.config.accounts.length}):*\n${accountLines}\n\n` +
+      `⏱ *Upload Delay:* ${this.config.upload.uploadDelaySeconds}s between uploads\n` +
+      `📊 *Daily Limit:* ${limitLine}\n` +
+      `🔄 *Poll Interval:* ${this.config.upload.pollingCron}`
+    );
+  }
+
+  /**
+   * Sent when the Graph API token is expiring soon.
+   */
+  async notifyTokenExpirySoon(daysLeft: number, expiryDate: string): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    const urgencyEmoji = daysLeft <= 3 ? '🚨' : '⚠️';
+    await this.sendMessage(
+      `${urgencyEmoji} *Graph API Token Expiring Soon!*\n\n` +
+      `Your Meta Graph API token will expire in *${daysLeft} day(s)* on *${expiryDate}*.\n\n` +
+      `If you don't renew it, ALL uploads will stop failing with an Auth Error!\n\n` +
+      `*To renew:* Go to Meta for Developers → Tools → Graph API Explorer → Generate new long-lived token, then update \`GRAPH_API_TOKEN\` in your Render environment variables.`
+    );
+  }
+
+  /**
+   * Sent when the daily upload limit is reached for an account.
+   */
+  async notifyDailyLimitReached(accountName: string, accountId: string, limit: number): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    await this.sendMessage(
+      `🛑 *Daily Upload Limit Reached*\n\n` +
+      `👤 *Account:* ${this.esc(accountName)} (\`${accountId}\`)\n` +
+      `📊 *Daily Limit:* ${limit} videos\n\n` +
+      `The bot will automatically resume uploading for this account tomorrow (after midnight UTC / 5:30 AM IST).\n\n` +
+      `To change the limit, update \`DAILY_UPLOAD_LIMIT\` in your Render environment variables.`
+    );
+  }
+
+  /**
+   * Sent when the upload queue grows unusually large.
+   */
+  async notifyLargeQueue(queueSize: number, threshold: number): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    await this.sendMessage(
+      `⚠️ *Large Upload Queue Detected*\n\n` +
+      `📦 *Queue Size:* ${queueSize} videos (threshold: ${threshold})\n\n` +
+      `This usually means many videos were added to Google Drive at once. The bot will process them one by one with the configured delay.\n\n` +
+      `⏱ *Estimated completion:* ~${Math.round(queueSize * this.config.upload.uploadDelaySeconds / 60)} minutes`
     );
   }
 

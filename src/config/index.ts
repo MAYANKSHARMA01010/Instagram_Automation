@@ -86,6 +86,7 @@ export function loadConfig(): Config {
       facebookPageId: process.env.FACEBOOK_PAGE_ID ?? '',
       graphApiToken: process.env.GRAPH_API_TOKEN ?? '',
       graphApiVersion: process.env.GRAPH_API_VERSION ?? 'v19.0',
+      tokenExpiryDate: process.env.TOKEN_EXPIRY_DATE,
     },
     content: {
       captionFile: path.resolve(process.cwd(), process.env.CAPTION_FILE ?? './caption.txt'),
@@ -102,6 +103,8 @@ export function loadConfig(): Config {
       statusPollIntervalMs: parseInt(process.env.STATUS_POLL_INTERVAL_MS ?? '15000', 10),
       statusPollTimeoutMs: parseInt(process.env.STATUS_POLL_TIMEOUT_MS ?? '1800000', 10),
       uploadDelaySeconds: parseInt(process.env.UPLOAD_DELAY_SECONDS ?? '120', 10),
+      dailyUploadLimit: parseInt(process.env.DAILY_UPLOAD_LIMIT ?? '0', 10), // 0 = unlimited
+      largeQueueWarningThreshold: parseInt(process.env.LARGE_QUEUE_WARNING_THRESHOLD ?? '10', 10),
     },
     database: {
       sqlitePath: path.resolve(process.cwd(), process.env.SQLITE_PATH ?? './database/uploads.db'),

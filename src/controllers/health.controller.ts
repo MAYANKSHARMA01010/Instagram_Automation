@@ -4,6 +4,9 @@ import { getUploadQueue } from '../queue/upload.queue';
 import { getSchedulerService } from '../services/scheduler.service';
 import { getDownloadWorker } from '../workers/download.worker';
 import { getStatusWorker } from '../workers/status.worker';
+import { getStatisticsService } from '../services/statistics.service';
+import { UploadLogModel } from '../database/repository';
+import { getConfig } from '../config';
 
 /**
  * GET /health
@@ -57,6 +60,24 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
     checks['instagram_processing'] = { status: 'error' };
   }
 
+  // ── Live stats ──────────────────────────────────────────────────────────────
+  const config = getConfig();
+  const dailyStats = getStatisticsService().getDailySummary();
+  const queueStats = await getUploadQueue().getStats();
+
+  // Token expiry info
+  let tokenExpiryInfo: Record<string, unknown> = { configured: false };
+  if (config.instagram.tokenExpiryDate) {
+    const expiry = new Date(config.instagram.tokenExpiryDate);
+    const daysLeft = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    tokenExpiryInfo = {
+      configured: true,
+      expiryDate: config.instagram.tokenExpiryDate,
+      daysRemaining: daysLeft,
+      status: daysLeft <= 0 ? 'EXPIRED' : daysLeft <= 10 ? 'WARNING' : 'OK',
+    };
+  }
+
   const allHealthy = Object.values(checks).every((c) => c.status === 'ok');
   const responseTime = Date.now() - startTime;
 
@@ -67,6 +88,26 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
     responseTimeMs: responseTime,
     version: process.env.npm_package_version ?? '1.0.0',
     checks,
+    stats: {
+      today: {
+        uploaded: dailyStats.uploadsToday,
+        failed: dailyStats.failuresToday,
+        successRate: dailyStats.successRate,
+        metaApiCalls: dailyStats.metaApiCallsToday,
+        avgUploadSeconds: dailyStats.avgUploadTimeSeconds,
+        retries: dailyStats.retriesToday,
+      },
+      queue: queueStats,
+      dailyLimit: config.upload.dailyUploadLimit === 0 ? 'unlimited' : config.upload.dailyUploadLimit,
+      accounts: dailyStats.accountSummaries.map(a => ({
+        name: a.accountName,
+        id: a.instagramAccountId,
+        uploadedToday: a.uploads,
+        failedToday: a.failures,
+        apiCallsToday: a.metaApiCalls,
+      })),
+      token: tokenExpiryInfo,
+    },
   });
 }
 
@@ -78,11 +119,13 @@ export async function queueStats(_req: Request, res: Response): Promise<void> {
   const queue = getUploadQueue();
   const stats = await queue.getStats();
   const worker = getDownloadWorker();
+  const todayTotal = await UploadLogModel.countTodaySuccess();
 
   res.json({
     success: true,
     data: {
       ...stats,
+      uploadedToday: todayTotal,
       activeWorkers: worker ? 1 : 0,
     },
   });
