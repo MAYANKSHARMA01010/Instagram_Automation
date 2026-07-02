@@ -184,6 +184,17 @@ export class NotificationService {
       errorBreakdownLine = `\n🚫 *Error Breakdown:* ${breakdown}`;
     }
 
+    // Build per-account breakdown
+    let accountBreakdownLine = '';
+    if (stats.accountSummaries.length > 0) {
+      const lines = stats.accountSummaries.map(a => {
+        const avgSec = a.uploads > 0 ? Math.round(a.totalUploadMs / a.uploads / 1000) : 0;
+        const statusIcon = a.failures > 0 ? '⚠️' : '✅';
+        return `  ${statusIcon} *${this.esc(a.accountName)}* (\`${a.instagramAccountId}\`): ${a.uploads} uploaded, ${a.failures} failed, ${a.metaApiCalls} API calls, avg ${avgSec}s`;
+      }).join('\n');
+      accountBreakdownLine = `\n\n👥 *Per-Account Breakdown:*\n${lines}`;
+    }
+
     const message = [
       `${successEmoji} *Batch Upload Complete*`,
       '',
@@ -195,7 +206,7 @@ export class NotificationService {
       `⚡ *Avg Upload Time:* ${stats.avgUploadTimeSeconds}s per video`,
       `🌐 *Meta API Calls Today:* ${stats.metaApiCallsToday}`,
       `✅ *Success Rate Today:* ${stats.successRate}`,
-      `🔁 *Total Retries Today:* ${stats.retriesToday}${errorBreakdownLine}`,
+      `🔁 *Total Retries Today:* ${stats.retriesToday}${errorBreakdownLine}${accountBreakdownLine}`,
       `🕐 *Completed:* ${new Date().toUTCString()}`,
     ].join('\n');
 
@@ -221,6 +232,17 @@ export class NotificationService {
       errorBreakdownLine = `\n\n🚫 *Error Breakdown:*\n${breakdown}`;
     }
 
+    // Per-account breakdown
+    let accountBreakdownLine = '';
+    if (stats.accountSummaries.length > 0) {
+      const lines = stats.accountSummaries.map(a => {
+        const avgSec = a.uploads > 0 ? Math.round(a.totalUploadMs / a.uploads / 1000) : 0;
+        const statusIcon = a.failures > 0 ? '⚠️' : '✅';
+        return `  ${statusIcon} *${this.esc(a.accountName)}* (\`${a.instagramAccountId}\`)\n     📤 Uploaded: ${a.uploads} | ❌ Failed: ${a.failures} | 🌐 API Calls: ${a.metaApiCalls} | ⚡ Avg: ${avgSec}s`;
+      }).join('\n');
+      accountBreakdownLine = `\n\n👥 *Per-Account Breakdown:*\n${lines}`;
+    }
+
     const message = [
       '📅 *Daily Summary Report*',
       '',
@@ -231,7 +253,7 @@ export class NotificationService {
       `⚡ *Avg Upload Time:* ${stats.avgUploadTimeSeconds}s per video`,
       `🌐 *Total Meta API Calls:* ${stats.metaApiCallsToday}`,
       `🔁 *Total Retries:* ${stats.retriesToday}`,
-      `🕐 *Report Time:* ${new Date().toUTCString()}${errorBreakdownLine}`,
+      `🕐 *Report Time:* ${new Date().toUTCString()}${errorBreakdownLine}${accountBreakdownLine}`,
     ].join('\n');
 
     await this.sendMessage(message);

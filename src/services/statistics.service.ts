@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import { getConfig } from '../config';
 
 interface StageAverages {
   videoDownload: number;
@@ -9,6 +10,15 @@ interface StageAverages {
   total: number;
 }
 
+export interface AccountStats {
+  accountName: string;
+  instagramAccountId: string;
+  uploads: number;
+  failures: number;
+  metaApiCalls: number;
+  totalUploadMs: number;
+}
+
 export interface DailySummary {
   uploadsToday: number;
   failuresToday: number;
@@ -17,6 +27,7 @@ export interface DailySummary {
   metaApiCallsToday: number;  // each upload = 2 calls (container + publish)
   avgUploadTimeSeconds: number;
   errorBreakdown: Record<string, number>;
+  accountSummaries: AccountStats[];
 }
 
 class StatisticsService {
@@ -26,6 +37,9 @@ class StatisticsService {
   private retriesToday = 0;
   private metaApiCallsToday = 0; // 2 per success (container + publish), 1 per failure
   private errorBreakdown: Record<string, number> = {};
+
+  // Per-account tracking: keyed by instagramAccountId
+  private accountStats: Map<string, AccountStats> = new Map();
 
   private timingSums = {
     videoDownload: 0,
@@ -49,6 +63,7 @@ class StatisticsService {
       this.retriesToday = 0;
       this.metaApiCallsToday = 0;
       this.errorBreakdown = {};
+      this.accountStats = new Map();
       this.timingSums = {
         videoDownload: 0,
         assetFetch: 0,
@@ -58,6 +73,25 @@ class StatisticsService {
         total: 0,
       };
     }
+  }
+
+  /**
+   * Returns or initialises the per-account stats bucket for a given account ID.
+   */
+  private getAccountBucket(accountId: string): AccountStats {
+    if (!this.accountStats.has(accountId)) {
+      const config = getConfig();
+      const account = config.accounts.find(a => a.instagramAccountId === accountId);
+      this.accountStats.set(accountId, {
+        accountName: account?.accountName ?? accountId,
+        instagramAccountId: accountId,
+        uploads: 0,
+        failures: 0,
+        metaApiCalls: 0,
+        totalUploadMs: 0,
+      });
+    }
+    return this.accountStats.get(accountId)!;
   }
 
   /**
@@ -92,10 +126,11 @@ class StatisticsService {
       metaApiCallsToday: this.metaApiCallsToday,
       avgUploadTimeSeconds,
       errorBreakdown: { ...this.errorBreakdown },
+      accountSummaries: Array.from(this.accountStats.values()),
     };
   }
 
-  recordSuccess(timings: Partial<StageAverages>, retries: number) {
+  recordSuccess(timings: Partial<StageAverages>, retries: number, accountId?: string) {
     this.checkReset();
     this.uploadsToday++;
     this.retriesToday += retries;
@@ -108,10 +143,18 @@ class StatisticsService {
     this.timingSums.publish += timings.publish || 0;
     this.timingSums.total += timings.total || 0;
 
+    // Per-account tracking
+    if (accountId) {
+      const bucket = this.getAccountBucket(accountId);
+      bucket.uploads++;
+      bucket.metaApiCalls += 2;
+      bucket.totalUploadMs += timings.total || 0;
+    }
+
     this.logSummary();
   }
 
-  recordFailure(retries: number, errorMessage?: string) {
+  recordFailure(retries: number, errorMessage?: string, accountId?: string) {
     this.checkReset();
     this.failuresToday++;
     this.retriesToday += retries;
@@ -120,6 +163,13 @@ class StatisticsService {
     if (errorMessage) {
       const category = this.categoriseError(errorMessage);
       this.errorBreakdown[category] = (this.errorBreakdown[category] || 0) + 1;
+    }
+
+    // Per-account tracking
+    if (accountId) {
+      const bucket = this.getAccountBucket(accountId);
+      bucket.failures++;
+      bucket.metaApiCalls += 1;
     }
 
     this.logSummary();
@@ -136,6 +186,8 @@ class StatisticsService {
       failures: this.failuresToday,
       successRate: `${successRate.toFixed(1)}%`,
       retries: this.retriesToday,
+      metaApiCalls: this.metaApiCallsToday,
+      perAccount: Array.from(this.accountStats.values()),
       averagesMs: {
         videoDownload: Math.round(avg(this.timingSums.videoDownload)),
         assetFetch: Math.round(avg(this.timingSums.assetFetch)),

@@ -328,7 +328,7 @@ export class UploadWorker {
       });
 
       const statisticsService = getStatisticsService();
-      statisticsService.recordSuccess(stageTimings, job.retryCount);
+      statisticsService.recordSuccess(stageTimings, job.retryCount, accountId);
 
       return { success: true };
     } catch (error) {
@@ -376,7 +376,7 @@ export class UploadWorker {
     const durationMs = elapsedMs(uploadStartTime);
 
     const statisticsService = getStatisticsService();
-    statisticsService.recordFailure(job.retryCount, errorMessage);
+    statisticsService.recordFailure(job.retryCount, errorMessage, job.instagramAccountId ?? undefined);
 
     await UploadJobModel.update(job.id, {
       status: 'FAILED',
