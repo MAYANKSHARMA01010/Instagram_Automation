@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { getUploadQueue } from '../queue/upload.queue';
 import { getDriveService } from './google-drive.service';
 import { ProcessedFileModel } from '../database/repository';
+import { getNotificationService } from './notification.service';
 
 /**
  * Scheduler service that periodically polls Google Drive for new videos
@@ -11,6 +12,7 @@ import { ProcessedFileModel } from '../database/repository';
  */
 export class SchedulerService {
   private task: ScheduledTask | null = null;
+  private dailySummaryTask: ScheduledTask | null = null;
   private isRunning = false;
   private readonly config = getConfig();
 
@@ -40,6 +42,12 @@ export class SchedulerService {
       void this.runPollCycle();
     });
 
+    // Daily summary at midnight IST (18:30 UTC)
+    this.dailySummaryTask = cron.schedule('30 18 * * *', () => {
+      void getNotificationService().notifyDailySummary();
+      logger.info('Daily summary notification sent');
+    });
+
     logger.info('Scheduler started', { cron: cronExpression });
 
     // Run immediately on startup
@@ -54,6 +62,10 @@ export class SchedulerService {
       this.task.stop();
       this.task = null;
       logger.info('Scheduler stopped');
+    }
+    if (this.dailySummaryTask) {
+      this.dailySummaryTask.stop();
+      this.dailySummaryTask = null;
     }
   }
 

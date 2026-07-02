@@ -9,12 +9,24 @@ interface StageAverages {
   total: number;
 }
 
+export interface DailySummary {
+  uploadsToday: number;
+  failuresToday: number;
+  retriesToday: number;
+  successRate: string;
+  metaApiCallsToday: number;  // each upload = 2 calls (container + publish)
+  avgUploadTimeSeconds: number;
+  errorBreakdown: Record<string, number>;
+}
+
 class StatisticsService {
   private currentDay: number;
   private uploadsToday = 0;
   private failuresToday = 0;
   private retriesToday = 0;
-  
+  private metaApiCallsToday = 0; // 2 per success (container + publish), 1 per failure
+  private errorBreakdown: Record<string, number> = {};
+
   private timingSums = {
     videoDownload: 0,
     assetFetch: 0,
@@ -35,6 +47,8 @@ class StatisticsService {
       this.uploadsToday = 0;
       this.failuresToday = 0;
       this.retriesToday = 0;
+      this.metaApiCallsToday = 0;
+      this.errorBreakdown = {};
       this.timingSums = {
         videoDownload: 0,
         assetFetch: 0,
@@ -46,10 +60,46 @@ class StatisticsService {
     }
   }
 
+  /**
+   * Categorises a Meta API error message into a short human-readable label.
+   */
+  categoriseError(errorMessage: string): string {
+    const msg = errorMessage.toLowerCase();
+    if (msg.includes('user access is restricted')) return 'Daily Limit Reached';
+    if (msg.includes('rate limit') || msg.includes('too many calls') || msg.includes('throttled')) return 'Rate Limited';
+    if (msg.includes('token') || msg.includes('oauth') || msg.includes('auth')) return 'Auth Error';
+    if (msg.includes('network') || msg.includes('econnreset') || msg.includes('timeout')) return 'Network Error';
+    if (msg.includes('validation') || msg.includes('invalid')) return 'Validation Error';
+    return 'Other Error';
+  }
+
+  /**
+   * Returns a snapshot of today's statistics for use in notifications.
+   */
+  getDailySummary(): DailySummary {
+    this.checkReset();
+    const totalAttempts = this.uploadsToday + this.failuresToday;
+    const successRate = totalAttempts === 0 ? '0.0%' : `${((this.uploadsToday / totalAttempts) * 100).toFixed(1)}%`;
+    const avgUploadTimeSeconds = this.uploadsToday === 0
+      ? 0
+      : Math.round(this.timingSums.total / this.uploadsToday / 1000);
+
+    return {
+      uploadsToday: this.uploadsToday,
+      failuresToday: this.failuresToday,
+      retriesToday: this.retriesToday,
+      successRate,
+      metaApiCallsToday: this.metaApiCallsToday,
+      avgUploadTimeSeconds,
+      errorBreakdown: { ...this.errorBreakdown },
+    };
+  }
+
   recordSuccess(timings: Partial<StageAverages>, retries: number) {
     this.checkReset();
     this.uploadsToday++;
     this.retriesToday += retries;
+    this.metaApiCallsToday += 2; // 1 container creation + 1 publish
 
     this.timingSums.videoDownload += timings.videoDownload || 0;
     this.timingSums.assetFetch += timings.assetFetch || 0;
@@ -61,10 +111,17 @@ class StatisticsService {
     this.logSummary();
   }
 
-  recordFailure(retries: number) {
+  recordFailure(retries: number, errorMessage?: string) {
     this.checkReset();
     this.failuresToday++;
     this.retriesToday += retries;
+    this.metaApiCallsToday += 1; // at least 1 container creation attempted
+
+    if (errorMessage) {
+      const category = this.categoriseError(errorMessage);
+      this.errorBreakdown[category] = (this.errorBreakdown[category] || 0) + 1;
+    }
+
     this.logSummary();
   }
 

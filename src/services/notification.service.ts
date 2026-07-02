@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getConfig } from '../config';
 import { UploadLogModel } from '../database/repository';
 import { BatchSummary } from '../types/upload.types';
+import { getStatisticsService } from './statistics.service';
 import logger from '../utils/logger';
 import { truncate } from '../utils/helpers';
 
@@ -97,6 +98,7 @@ export class NotificationService {
     const uploadSeconds = Math.round(payload.uploadTimeMs / 1000);
     const totalToday = await UploadLogModel.countTodaySuccess();
     const startTime = new Date(Date.now() - payload.uploadTimeMs).toUTCString();
+    const stats = getStatisticsService().getDailySummary();
 
     let header = '✅ *Reel Uploaded Successfully*';
     const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
@@ -111,6 +113,8 @@ export class NotificationService {
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
       `🔜 *Queue Remaining:* ${payload.queueRemaining} video(s)`,
       `📊 *Total Uploaded Today:* ${totalToday}`,
+      `🌐 *Meta API Calls Today:* ${stats.metaApiCallsToday}`,
+      `✅ *Success Rate Today:* ${stats.successRate}`,
       `🕐 *Started:* ${startTime}`,
       `🕐 *Completed:* ${new Date().toUTCString()}`,
     ].join('\n');
@@ -131,6 +135,8 @@ export class NotificationService {
 
     const stackPreview = payload.stack ? truncate(payload.stack, 300) : 'N/A';
     const httpLine = payload.httpStatus ? `\n🌐 *HTTP Status:* ${payload.httpStatus}` : '';
+    const stats = getStatisticsService().getDailySummary();
+    const errorCategory = getStatisticsService().categoriseError(payload.reason);
 
     let header = '❌ *Reel Upload Failed*';
     const account = this.config.accounts.find(a => a.instagramAccountId === payload.accountId);
@@ -142,7 +148,10 @@ export class NotificationService {
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
       `💬 *Error:* ${this.esc(payload.reason)}${httpLine}`,
+      `🚫 *Error Category:* ${errorCategory}`,
       `🔁 *Retry Count:* ${payload.retryCount}`,
+      `📊 *Today: ${stats.uploadsToday} uploaded / ${stats.failuresToday} failed (${stats.successRate} success)*`,
+      `🌐 *Meta API Calls Today:* ${stats.metaApiCallsToday}`,
       `🔍 *Stack:*\n\`\`\`\n${this.esc(stackPreview)}\n\`\`\``,
       `🕐 *Failed At:* ${new Date().toUTCString()}`,
     ].join('\n');
@@ -162,8 +171,18 @@ export class NotificationService {
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
     const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    const stats = getStatisticsService().getDailySummary();
 
     const successEmoji = summary.totalFailed === 0 ? '🎉' : '⚠️';
+
+    // Build error breakdown line if there were failures
+    let errorBreakdownLine = '';
+    if (Object.keys(stats.errorBreakdown).length > 0) {
+      const breakdown = Object.entries(stats.errorBreakdown)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      errorBreakdownLine = `\n🚫 *Error Breakdown:* ${breakdown}`;
+    }
 
     const message = [
       `${successEmoji} *Batch Upload Complete*`,
@@ -173,7 +192,46 @@ export class NotificationService {
       `❌ *Failed:* ${summary.totalFailed}`,
       `⏭️ *Skipped (already uploaded):* ${summary.totalSkipped}`,
       `⏱ *Total Processing Time:* ${durationStr}`,
+      `⚡ *Avg Upload Time:* ${stats.avgUploadTimeSeconds}s per video`,
+      `🌐 *Meta API Calls Today:* ${stats.metaApiCallsToday}`,
+      `✅ *Success Rate Today:* ${stats.successRate}`,
+      `🔁 *Total Retries Today:* ${stats.retriesToday}${errorBreakdownLine}`,
       `🕐 *Completed:* ${new Date().toUTCString()}`,
+    ].join('\n');
+
+    await this.sendMessage(message);
+  }
+
+  /**
+   * Sent as a daily recap at midnight. Summarises the full day's performance.
+   */
+  async notifyDailySummary(): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    const stats = getStatisticsService().getDailySummary();
+    const totalAttempts = stats.uploadsToday + stats.failuresToday;
+
+    if (totalAttempts === 0) return; // Nothing happened today, skip summary
+
+    let errorBreakdownLine = '';
+    if (Object.keys(stats.errorBreakdown).length > 0) {
+      const breakdown = Object.entries(stats.errorBreakdown)
+        .map(([k, v]) => `  • ${k}: ${v}x`)
+        .join('\n');
+      errorBreakdownLine = `\n\n🚫 *Error Breakdown:*\n${breakdown}`;
+    }
+
+    const message = [
+      '📅 *Daily Summary Report*',
+      '',
+      `📊 *Total Attempts:* ${totalAttempts}`,
+      `✅ *Successful Uploads:* ${stats.uploadsToday}`,
+      `❌ *Failed Uploads:* ${stats.failuresToday}`,
+      `🏆 *Success Rate:* ${stats.successRate}`,
+      `⚡ *Avg Upload Time:* ${stats.avgUploadTimeSeconds}s per video`,
+      `🌐 *Total Meta API Calls:* ${stats.metaApiCallsToday}`,
+      `🔁 *Total Retries:* ${stats.retriesToday}`,
+      `🕐 *Report Time:* ${new Date().toUTCString()}${errorBreakdownLine}`,
     ].join('\n');
 
     await this.sendMessage(message);

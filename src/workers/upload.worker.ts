@@ -376,7 +376,7 @@ export class UploadWorker {
     const durationMs = elapsedMs(uploadStartTime);
 
     const statisticsService = getStatisticsService();
-    statisticsService.recordFailure(job.retryCount);
+    statisticsService.recordFailure(job.retryCount, errorMessage);
 
     await UploadJobModel.update(job.id, {
       status: 'FAILED',
