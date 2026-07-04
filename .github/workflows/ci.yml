@@ -22,19 +22,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Node.js Setup ───────────────────────────────────────────────────────
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
       # ── pnpm Setup ──────────────────────────────────────────────────────────
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
           version: '9'
           run_install: false
+
+      # ── Node.js Setup ───────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
 
       # ── Dependency Cache ────────────────────────────────────────────────────
       - name: Get pnpm store directory
