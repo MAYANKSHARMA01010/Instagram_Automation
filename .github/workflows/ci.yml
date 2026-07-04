@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'feature/**', 'fix/**', 'hotfix/**']
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node.js Setup ───────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      # ── pnpm Setup ──────────────────────────────────────────────────────────
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '9'
+          run_install: false
+
+      # ── Dependency Cache ────────────────────────────────────────────────────
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      # ── Install Dependencies ─────────────────────────────────────────────────
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Generate Prisma Client ───────────────────────────────────────────────
+      - name: Generate Prisma Client
+        run: pnpm exec prisma generate
+        env:
+          # Prisma generate only needs the schema, not a real DB connection
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_db
+
+      # ── TypeScript Typecheck ─────────────────────────────────────────────────
+      - name: TypeScript typecheck
+        run: pnpm exec tsc --noEmit
+
+      # ── ESLint ───────────────────────────────────────────────────────────────
+      - name: ESLint
+        run: pnpm exec eslint "src/**/*.ts" "tests/**/*.ts"
+
+      # ── Unit Tests ───────────────────────────────────────────────────────────
+      - name: Run tests with coverage
+        run: pnpm test -- --coverage --coverageReporters=lcov --coverageReporters=text-summary
+        env:
+          # Minimal env for tests — real secrets not needed (mocked)
+          NODE_ENV: test
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_db
+
+      # ── Upload Coverage Report ───────────────────────────────────────────────
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+          flags: unit
+          name: instagram-automation-coverage
+        continue-on-error: true
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build TypeScript
+        run: pnpm run build
+
+      # ── Dist Artifact ────────────────────────────────────────────────────────
+      - name: Upload build artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7

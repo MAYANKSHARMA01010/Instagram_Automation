@@ -12,7 +12,10 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "migrate": "ts-node src/database/migrations/run.ts"
+    "migrate": "ts-node src/database/migrations/run.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "instagram",
