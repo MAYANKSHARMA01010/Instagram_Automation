@@ -10,7 +10,7 @@ describe('Warm-up Utilities', () => {
     const today = new Date();
     const threeDaysAgo = subDays(today, 2); // 0 days ago = day 1, 2 days ago = day 3
     const dateStr = formatISO(threeDaysAgo);
-    
+
     expect(calculateWarmupDay(dateStr)).toBe(3);
   });
 
