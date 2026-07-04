@@ -30,7 +30,7 @@ export interface DailySummary {
   accountSummaries: AccountStats[];
 }
 
-class StatisticsService {
+export class StatisticsService {
   private currentDay: number;
   private uploadsToday = 0;
   private failuresToday = 0;

@@ -6,6 +6,8 @@ export interface RetryOptions {
   maxDelayMs?: number;
   shouldRetry?: (error: unknown) => boolean;
   onRetry?: (attempt: number, error: unknown) => void;
+  abortSignal?: AbortSignal;
+  label?: string;
 }
 
 /**
@@ -48,15 +50,25 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions):
     maxDelayMs = 60_000,
     shouldRetry = defaultShouldRetry,
     onRetry,
+    abortSignal,
+    label = 'operation',
   } = options;
 
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (abortSignal?.aborted) {
+      throw new Error('The operation was aborted');
+    }
+
     try {
       return await fn();
     } catch (error) {
       lastError = error;
+
+      if (abortSignal?.aborted) {
+        throw new Error('The operation was aborted');
+      }
 
       if (attempt === maxAttempts || !shouldRetry(error)) {
         throw error;
@@ -67,17 +79,18 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions):
       const totalDelay = Math.round(delay + jitter);
 
       logger.warn('Retry attempt', {
+        label,
         attempt,
         maxAttempts,
         delayMs: totalDelay,
-        error: error instanceof Error ? error.message : String(error),
+        error: lastError instanceof Error ? lastError.message : String(lastError),
       });
 
       if (onRetry) {
         onRetry(attempt, error);
       }
 
-      await sleep(totalDelay);
+      await sleep(totalDelay, abortSignal);
     }
   }
 
@@ -87,8 +100,21 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions):
 /**
  * Sleeps for the specified number of milliseconds.
  */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      return reject(new Error('The operation was aborted'));
+    }
+
+    const timer = setTimeout(resolve, ms);
+
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(new Error('The operation was aborted'));
+      });
+    }
+  });
 }
 
 /**

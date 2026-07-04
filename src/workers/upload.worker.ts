@@ -369,6 +369,8 @@ export class UploadWorker {
         errorMessage.includes('User access is restricted') ||
         (httpStatus === 400 && errorMessage.includes('Meta API Error'));
 
+      console.error('WORKER CAUGHT ERROR:', errorMessage, errorStack);
+
       await this.failJob(
         job,
         errorMessage,
