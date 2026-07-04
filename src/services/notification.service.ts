@@ -287,7 +287,7 @@ export class NotificationService {
         `👥 *Active Accounts (${this.config.accounts.length}):*\n${accountLines}\n\n` +
         `⏱ *Upload Delay:* ${this.config.upload.uploadDelaySeconds}s between uploads\n` +
         `📊 *Daily Limit:* ${limitLine}\n` +
-        `🔄 *Poll Interval:* ${this.config.upload.pollingCron}`,
+        `🔄 *Poll Interval:* \`${this.config.upload.pollingCron}\``,
     );
   }
 
@@ -441,11 +441,17 @@ export class NotificationService {
       });
 
       logger.debug('Telegram notification sent', { threadId });
-    } catch (error) {
+    } catch (error: unknown) {
       // Notification failures must never crash the upload pipeline
-      logger.error('Failed to send Telegram notification', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      let errorMsg: string;
+      if (axios.isAxiosError(error) && error.response?.data) {
+        errorMsg = JSON.stringify(error.response.data);
+      } else if (error instanceof Error) {
+        errorMsg = error.message;
+      } else {
+        errorMsg = String(error);
+      }
+      logger.error('Failed to send Telegram notification', { error: errorMsg });
     }
   }
 

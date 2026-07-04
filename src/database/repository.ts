@@ -375,7 +375,9 @@ export const AccountHealthModel = {
   /**
    * Upserts the health record for an account. Defaults to score 100 if new.
    */
-  async getOrCreate(instagramAccountId: string): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs>> {
+  async getOrCreate(
+    instagramAccountId: string,
+  ): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs>> {
     const db = getDatabase();
     return db.accountHealth.upsert({
       where: { instagramAccountId },
@@ -387,7 +389,9 @@ export const AccountHealthModel = {
   /**
    * Retrieves the health record. Returns null if not found.
    */
-  async get(instagramAccountId: string): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs> | null> {
+  async get(
+    instagramAccountId: string,
+  ): Promise<Prisma.AccountHealthGetPayload<Prisma.AccountHealthDefaultArgs> | null> {
     const db = getDatabase();
     return db.accountHealth.findUnique({
       where: { instagramAccountId },
