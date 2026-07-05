@@ -273,7 +273,7 @@ export class NotificationService {
     if (!this.isConfigured()) return;
 
     const globalDailyLimit = this.config.upload.dailyUploadLimit;
-    const globalLimitLine = globalDailyLimit > 0 ? `${globalDailyLimit}` : 'Unlimited';
+    const globalLimitLine = globalDailyLimit > 0 ? `${globalDailyLimit} videos/day` : 'Unlimited';
 
     const accountLines = this.config.accounts
       .map((a, i) => {
@@ -285,7 +285,7 @@ export class NotificationService {
           if (globalDailyLimit > 0) {
             baseLimit = Math.min(baseLimit, globalDailyLimit);
           }
-          limitDetails = `Warmup Day ${day} (Limit: ${baseLimit})`;
+          limitDetails = `Warmup Day ${day} (Max: ${baseLimit} videos)`;
         }
         return `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`) - ${limitDetails}`;
       })
