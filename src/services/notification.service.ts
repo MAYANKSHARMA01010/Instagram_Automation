@@ -5,6 +5,7 @@ import { BatchSummary } from '../types/upload.types';
 import { getStatisticsService } from './statistics.service';
 import logger from '../utils/logger';
 import { truncate } from '../utils/helpers';
+import { calculateWarmupDay, getWarmupLimit } from '../utils/warmup.util';
 
 // ─── Payload Interfaces ───────────────────────────────────────────────────────
 
@@ -271,22 +272,31 @@ export class NotificationService {
   async notifyStartup(): Promise<void> {
     if (!this.isConfigured()) return;
 
-    const accountLines = this.config.accounts
-      .map(
-        (a, i) =>
-          `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`)`,
-      )
-      .join('\n');
+    const globalDailyLimit = this.config.upload.dailyUploadLimit;
+    const globalLimitLine = globalDailyLimit > 0 ? `${globalDailyLimit}` : 'Unlimited';
 
-    const dailyLimit = this.config.upload.dailyUploadLimit;
-    const limitLine = dailyLimit > 0 ? `${dailyLimit} videos/day` : 'Unlimited';
+    const accountLines = this.config.accounts
+      .map((a, i) => {
+        let limitDetails = `Global: ${globalLimitLine}`;
+        if (a.enableWarmup || a.isNewAccount) {
+          const targetLimit = a.targetDailyLimit ?? this.config.upload.targetDailyLimit;
+          const day = calculateWarmupDay(a.warmupStartDate);
+          let baseLimit = getWarmupLimit(day, targetLimit);
+          if (globalDailyLimit > 0) {
+            baseLimit = Math.min(baseLimit, globalDailyLimit);
+          }
+          limitDetails = `Warmup Day ${day} (Limit: ${baseLimit})`;
+        }
+        return `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`) - ${limitDetails}`;
+      })
+      .join('\n');
 
     await this.sendMessage(
       `🚀 *Instagram Reels Uploader Started*\n\n` +
         `The automation system is online and monitoring Google Drive.\n\n` +
         `👥 *Active Accounts (${this.config.accounts.length}):*\n${accountLines}\n\n` +
         `⏱ *Upload Delay:* ${this.config.upload.uploadDelaySeconds}s between uploads\n` +
-        `📊 *Daily Limit:* ${limitLine}\n` +
+        `📊 *Global Limit:* ${globalLimitLine}\n` +
         `🔄 *Poll Interval:* \`${this.config.upload.pollingCron}\``,
     );
   }
