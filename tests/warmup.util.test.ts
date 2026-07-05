@@ -15,20 +15,20 @@ describe('Warm-up Utilities', () => {
   });
 
   it('should cap the limit at the target limit', () => {
-    // Day 30 normally has 32
+    // Day 30 normally has 40
     expect(getWarmupLimit(30, 20)).toBe(20);
-    expect(getWarmupLimit(30, 40)).toBe(32);
+    expect(getWarmupLimit(30, 40)).toBe(40);
   });
 
   it('should correctly map day index to the schedule array', () => {
-    expect(getWarmupLimit(1, 32)).toBe(1);
-    expect(getWarmupLimit(5, 32)).toBe(3);
-    expect(getWarmupLimit(15, 32)).toBe(10);
-    expect(getWarmupLimit(30, 32)).toBe(32);
+    expect(getWarmupLimit(1, 40)).toBe(1);
+    expect(getWarmupLimit(5, 40)).toBe(3);
+    expect(getWarmupLimit(15, 40)).toBe(12);
+    expect(getWarmupLimit(30, 40)).toBe(40);
   });
 
   it('should return the maximum schedule value if day > 30', () => {
-    expect(getWarmupLimit(45, 32)).toBe(32);
+    expect(getWarmupLimit(45, 40)).toBe(40);
   });
 
   it('should identify when warm-up is completed', () => {

@@ -36,10 +36,16 @@ Refer to the [Configuration Guide](docs/CONFIGURATION.md) for details on all ava
 pnpm exec prisma db push
 ```
 
-### 5. Running
+### 5. Testing
 ```bash
-pnpm build
-pnpm start
+pnpm run test
+```
+
+### 6. Running
+```bash
+pnpm run build
+pnpm run start
+pnpm run dev
 ```
 
 ## Documentation Index
@@ -47,19 +53,19 @@ pnpm start
 The `/docs` directory contains the complete source of truth for operating and maintaining this system.
 
 ### Architecture & Engineering
-- [Architecture Details](docs/ARCHITECTURE.md)
-- [API Reference](docs/API.md)
-- [Testing Guide](docs/TESTING.md)
+- [Architecture Details](docs/technical/ARCHITECTURE.md)
+- [API Reference](docs/technical/API.md)
+- [Testing Guide](docs/technical/TESTING.md)
 
 ### Deployment & Setup
-- [Configuration Guide](docs/CONFIGURATION.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Configuration Guide](docs/technical/CONFIGURATION.md)
+- [Deployment Guide](docs/technical/DEPLOYMENT.md)
 
 ### SRE & Operations
-- [Operations Manual](docs/OPERATIONS.md)
-- [Monitoring & Logging](docs/MONITORING.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Incident Response](docs/INCIDENT_RESPONSE.md)
+- [Operations Manual](docs/technical/OPERATIONS.md)
+- [Monitoring & Logging](docs/technical/MONITORING.md)
+- [Troubleshooting](docs/technical/TROUBLESHOOTING.md)
+- [Incident Response](docs/management/INCIDENT_RESPONSE.md)
 
 ## Contribution & Development
-Please refer to the [Development Rules](DEVELOPMENT_RULES.md) for contribution guidelines. All PRs must pass the CI pipeline (`pnpm test` and `eslint`).
+Please refer to the [Development Rules](docs/management/DEVELOPMENT_RULES.md) for contribution guidelines. All PRs must pass the CI pipeline (`pnpm run test` and `eslint`).
