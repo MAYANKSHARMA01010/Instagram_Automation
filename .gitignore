@@ -1,8 +1,8 @@
 node_modules/
 dist/
 .env
-logs/*.log
-database/*.db
+logs/
+database/
 tmp/
 *.tmp
 .DS_Store

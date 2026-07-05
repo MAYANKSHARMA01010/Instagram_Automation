@@ -33,7 +33,6 @@ async function bootstrap(): Promise<void> {
   // 2. Ensure required directories exist
   ensureDir('./logs');
   ensureDir('./tmp');
-  ensureDir('./database');
   ensureDir('./public/cover');
 
   // 3. Recover stuck jobs from previous run
