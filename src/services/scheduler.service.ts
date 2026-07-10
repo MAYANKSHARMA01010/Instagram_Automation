@@ -12,6 +12,7 @@ import { differenceInMinutes, parse, startOfDay, addMinutes } from 'date-fns';
 export class SchedulerService {
   private task: ScheduledTask | null = null;
   private dailySummaryTask: ScheduledTask | null = null;
+  private morningPlanTask: ScheduledTask | null = null;
   private tokenExpiryTask: ScheduledTask | null = null;
   private isRunning = false;
   private largeQueueWarned = false; // Prevents spamming the large-queue warning
@@ -44,6 +45,13 @@ export class SchedulerService {
       logger.info('Daily summary notification sent');
     });
 
+    const [startHour, startMin] = this.config.upload.postingWindowStart.split(':');
+    const morningCron = `${startMin || '0'} ${startHour || '8'} * * *`;
+    this.morningPlanTask = cron.schedule(morningCron, () => {
+      void getNotificationService().notifyMorningPlan();
+      logger.info('Morning plan notification sent');
+    });
+
     this.tokenExpiryTask = cron.schedule('30 3 * * *', () => {
       void this.checkTokenExpiry();
     });
@@ -62,6 +70,10 @@ export class SchedulerService {
     if (this.dailySummaryTask) {
       this.dailySummaryTask.stop();
       this.dailySummaryTask = null;
+    }
+    if (this.morningPlanTask) {
+      this.morningPlanTask.stop();
+      this.morningPlanTask = null;
     }
     if (this.tokenExpiryTask) {
       this.tokenExpiryTask.stop();

@@ -302,6 +302,41 @@ export class NotificationService {
   }
 
   /**
+   * Sent every morning to summarize the upload plan for the day.
+   */
+  async notifyMorningPlan(): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    const globalDailyLimit = this.config.upload.dailyUploadLimit;
+    const globalLimitLine = globalDailyLimit > 0 ? `${globalDailyLimit} videos/day` : 'Unlimited';
+
+    const accountLines = this.config.accounts
+      .map((a, i) => {
+        let limitDetails = `Global: ${globalLimitLine}`;
+        if (a.enableWarmup || a.isNewAccount) {
+          const targetLimit = a.targetDailyLimit ?? this.config.upload.targetDailyLimit;
+          const day = calculateWarmupDay(a.warmupStartDate);
+          let baseLimit = getWarmupLimit(day, targetLimit);
+          if (globalDailyLimit > 0) {
+            baseLimit = Math.min(baseLimit, globalDailyLimit);
+          }
+          limitDetails = `Warmup Day ${day} (Max: ${baseLimit} videos)`;
+        }
+        return `  ${i + 1}. *${this.esc(a.accountName ?? a.instagramAccountId)}* (\`${a.instagramAccountId}\`) - ${limitDetails}`;
+      })
+      .join('\n');
+
+    await this.sendMessage(
+      `🌅 *Daily Upload Plan*\n\n` +
+        `Good morning! The automation system is ready to process today's videos.\n\n` +
+        `👥 *Active Accounts (${this.config.accounts.length}):*\n${accountLines}\n\n` +
+        `⏱ *Upload Delay:* ${this.config.upload.uploadDelaySeconds}s between uploads\n` +
+        `📊 *Global Limit:* ${globalLimitLine}\n` +
+        `🔄 *Posting Window:* \`${this.config.upload.postingWindowStart} - ${this.config.upload.postingWindowEnd}\``,
+    );
+  }
+
+  /**
    * Sent when the Graph API token is expiring soon.
    */
   async notifyTokenExpirySoon(daysLeft: number, expiryDate: string): Promise<void> {
