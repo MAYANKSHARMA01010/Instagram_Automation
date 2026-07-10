@@ -7,6 +7,7 @@ import { getStatusWorker } from '../workers/status.worker';
 import { getStatisticsService } from '../services/statistics.service';
 import { UploadLogModel } from '../database/repository';
 import { getConfig } from '../config';
+import { calculateWarmupDay, getWarmupLimit } from '../utils/warmup.util';
 
 /**
  * GET /health
@@ -100,13 +101,28 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
       queue: queueStats,
       dailyLimit:
         config.upload.dailyUploadLimit === 0 ? 'unlimited' : config.upload.dailyUploadLimit,
-      accounts: dailyStats.accountSummaries.map((a) => ({
-        name: a.accountName,
-        id: a.instagramAccountId,
-        uploadedToday: a.uploads,
-        failedToday: a.failures,
-        apiCallsToday: a.metaApiCalls,
-      })),
+      accounts: dailyStats.accountSummaries.map((a) => {
+        const accConfig = config.accounts.find((acc) => acc.instagramAccountId === a.instagramAccountId);
+        let limitToday = config.upload.dailyUploadLimit;
+
+        if (accConfig && (accConfig.enableWarmup || accConfig.isNewAccount)) {
+          const targetLimit = accConfig.targetDailyLimit ?? config.upload.targetDailyLimit;
+          const day = calculateWarmupDay(accConfig.warmupStartDate);
+          limitToday = getWarmupLimit(day, targetLimit);
+          if (config.upload.dailyUploadLimit > 0) {
+            limitToday = Math.min(limitToday, config.upload.dailyUploadLimit);
+          }
+        }
+
+        return {
+          name: a.accountName,
+          id: a.instagramAccountId,
+          uploadedToday: a.uploads,
+          failedToday: a.failures,
+          apiCallsToday: a.metaApiCalls,
+          limitToday: limitToday,
+        };
+      }),
       token: tokenExpiryInfo,
     },
   });
