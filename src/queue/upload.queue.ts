@@ -171,7 +171,7 @@ export class UploadQueue extends EventEmitter {
   async countPendingForAccount(instagramAccountId: string): Promise<number> {
     return getDatabase().uploadJob.count({
       where: {
-        status: 'PENDING',
+        status: { in: ['PENDING', 'DOWNLOADING', 'UPLOADING', 'PROCESSING', 'PUBLISHING'] },
         instagramAccountId,
       },
     });
