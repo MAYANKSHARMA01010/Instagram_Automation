@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { healthCheck, queueStats } from '../controllers/health.controller';
+import { healthCheck, queueStats, todayLogsReport } from '../controllers/health.controller';
 
 const router: Router = Router();
 
@@ -17,6 +17,14 @@ router.get('/', (req, res) => {
  */
 router.get('/queue', (req, res) => {
   void queueStats(req, res);
+});
+
+/**
+ * @route  GET /health/reports/today
+ * @desc   Detailed logs of today's uploads (public)
+ */
+router.get('/reports/today', (req, res) => {
+  void todayLogsReport(req, res);
 });
 
 export default router;

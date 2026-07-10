@@ -131,3 +131,23 @@ export async function queueStats(_req: Request, res: Response): Promise<void> {
     },
   });
 }
+
+/**
+ * GET /health/reports/today
+ * Returns raw, detailed JSON log of all uploads for today (UTC) for diagnostics.
+ */
+export async function todayLogsReport(_req: Request, res: Response): Promise<void> {
+  try {
+    const logs = await UploadLogModel.getTodayLogs();
+    res.json({
+      success: true,
+      count: logs.length,
+      data: logs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}

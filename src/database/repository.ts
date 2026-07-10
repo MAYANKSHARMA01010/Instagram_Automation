@@ -136,6 +136,34 @@ export const UploadLogModel = {
   },
 
   /**
+   * Returns all upload logs for today (UTC).
+   */
+  async getTodayLogs(): Promise<UploadLog[]> {
+    const db = getDatabase();
+
+    // Calculate start and end of today in UTC
+    const now = new Date();
+    const startOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const endOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+    );
+
+    const logs = await db.uploadLog.findMany({
+      where: {
+        createdAt: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return logs.map(mapUploadLog);
+  },
+
+  /**
    * Returns true if a file with the given name was already uploaded today for a given account.
    * Used to prevent re-uploading same-named videos on the same day across multiple accounts.
    */
