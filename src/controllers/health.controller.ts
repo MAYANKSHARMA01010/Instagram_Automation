@@ -101,28 +101,35 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
       queue: queueStats,
       dailyLimit:
         config.upload.dailyUploadLimit === 0 ? 'unlimited' : config.upload.dailyUploadLimit,
-      accounts: dailyStats.accountSummaries.map((a) => {
-        const accConfig = config.accounts.find((acc) => acc.instagramAccountId === a.instagramAccountId);
-        let limitToday = config.upload.dailyUploadLimit;
+      accounts: await Promise.all(
+        config.accounts.map(async (accConfig) => {
+          const memStat = dailyStats.accountSummaries.find(
+            (a) => a.instagramAccountId === accConfig.instagramAccountId,
+          );
+          const uploadedTodayDB = await UploadLogModel.countTodaySuccessByAccount(
+            accConfig.instagramAccountId,
+          );
+          let limitToday = config.upload.dailyUploadLimit;
 
-        if (accConfig && (accConfig.enableWarmup || accConfig.isNewAccount)) {
-          const targetLimit = accConfig.targetDailyLimit ?? config.upload.targetDailyLimit;
-          const day = calculateWarmupDay(accConfig.warmupStartDate);
-          limitToday = getWarmupLimit(day, targetLimit);
-          if (config.upload.dailyUploadLimit > 0) {
-            limitToday = Math.min(limitToday, config.upload.dailyUploadLimit);
+          if (accConfig.enableWarmup || accConfig.isNewAccount) {
+            const targetLimit = accConfig.targetDailyLimit ?? config.upload.targetDailyLimit;
+            const day = calculateWarmupDay(accConfig.warmupStartDate);
+            limitToday = getWarmupLimit(day, targetLimit);
+            if (config.upload.dailyUploadLimit > 0) {
+              limitToday = Math.min(limitToday, config.upload.dailyUploadLimit);
+            }
           }
-        }
 
-        return {
-          name: a.accountName,
-          id: a.instagramAccountId,
-          uploadedToday: a.uploads,
-          failedToday: a.failures,
-          apiCallsToday: a.metaApiCalls,
-          limitToday: limitToday,
-        };
-      }),
+          return {
+            name: accConfig.accountName,
+            id: accConfig.instagramAccountId,
+            uploadedToday: Math.max(uploadedTodayDB, memStat?.uploads ?? 0),
+            failedToday: memStat?.failures ?? 0,
+            apiCallsToday: memStat?.metaApiCalls ?? 0,
+            limitToday: limitToday,
+          };
+        }),
+      ),
       token: tokenExpiryInfo,
     },
   });

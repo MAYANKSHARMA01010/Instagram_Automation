@@ -53,6 +53,7 @@ function parseAccountsConfig(): AccountMapping[] {
     try {
       return JSON.parse(accountsStr) as AccountMapping[];
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.error('Failed to parse ACCOUNTS_CONFIG env variable:', e);
       // Fall through to legacy if parse fails
     }
