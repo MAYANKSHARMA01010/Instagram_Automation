@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
 import { getConfig } from '../config';
+import { classifyError, ErrorCategory } from '../utils/error-classifier';
 
 interface StageAverages {
   videoDownload: number;
@@ -96,16 +97,20 @@ export class StatisticsService {
 
   /**
    * Categorises a Meta API error message into a short human-readable label.
+   * Preserves legacy metric labels for additive metrics.
    */
   categoriseError(errorMessage: string): string {
+    const category = classifyError(errorMessage);
     const msg = errorMessage.toLowerCase();
+
+    // Preserve legacy specific label
     if (msg.includes('user access is restricted')) return 'Daily Limit Reached';
-    if (msg.includes('rate limit') || msg.includes('too many calls') || msg.includes('throttled'))
-      return 'Rate Limited';
-    if (msg.includes('token') || msg.includes('oauth') || msg.includes('auth')) return 'Auth Error';
-    if (msg.includes('network') || msg.includes('econnreset') || msg.includes('timeout'))
-      return 'Network Error';
-    if (msg.includes('validation') || msg.includes('invalid')) return 'Validation Error';
+
+    if (category === ErrorCategory.INFRASTRUCTURE) return 'Infrastructure Error'; // New category
+    if (category === ErrorCategory.AUTH) return 'Auth Error';
+    if (category === ErrorCategory.RATE_LIMIT) return 'Rate Limited';
+    if (category === ErrorCategory.PLATFORM) return 'Platform Restriction';
+    if (category === ErrorCategory.VALIDATION) return 'Validation Error';
     return 'Other Error';
   }
 

@@ -9,6 +9,9 @@ import {
 import { withRetry, pollUntil } from '../utils/retry';
 import { getConfig } from '../config';
 import logger from '../utils/logger';
+import { sanitizeError } from '../utils/error-sanitizer';
+import { AccountNetworkContext } from '../types/network.types';
+import { buildRequestConfig } from '../utils/proxy-agent';
 
 /**
  * Service for interacting with the Meta (Instagram) Graph API.
@@ -38,7 +41,7 @@ export class InstagramService {
       return config;
     });
 
-    // Log API errors
+    // Log API errors and sanitize them before they propagate
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError<GraphApiErrorResponse>) => {
@@ -51,7 +54,10 @@ export class InstagramService {
             fbtraceId: graphError.fbtraceId,
           });
         }
-        return Promise.reject(error);
+        
+        // Layer 1: Sanitize at the network boundary
+        const safeError = sanitizeError(error);
+        return Promise.reject(safeError);
       },
     );
   }
@@ -60,18 +66,19 @@ export class InstagramService {
    * Creates a media container for a Reel.
    * The video must be publicly accessible via a URL.
    *
+   * @param context - Network context including account ID and proxy configuration
    * @param videoUrl - Publicly accessible URL to the video file
    * @param caption - Caption text for the Reel
    * @param coverUrl - Optional cover image URL
    */
   async createReelContainer(
-    accountId: string,
+    context: AccountNetworkContext,
     videoUrl: string,
     caption: string,
     coverUrl?: string,
   ): Promise<InstagramContainerCreateResponse> {
     logger.info('Creating Instagram Reel container', {
-      accountId,
+      accountId: context.accountId,
       hasCaption: !!caption,
       hasCoverUrl: !!coverUrl,
     });
@@ -90,20 +97,25 @@ export class InstagramService {
     return withRetry(
       async () => {
         try {
+          const requestConfig = {
+            params,
+            ...buildRequestConfig(context),
+          };
+          
           const response = await this.client.post<InstagramContainerCreateResponse>(
-            `/${accountId}/media`,
+            `/${context.accountId}/media`,
             null,
-            { params },
+            requestConfig,
           );
 
           logger.info('Reel container created', { containerId: response.data.id });
           return response.data;
         } catch (err: unknown) {
-          const axiosErr = err as AxiosError<GraphApiErrorResponse>;
-          if (axiosErr.response?.data?.error?.message) {
-            axiosErr.message = `${axiosErr.message} - Meta API Error: ${axiosErr.response.data.error.message}`;
+          let errorToThrow = err as any;
+          if (errorToThrow.response?.data?.error?.message) {
+            errorToThrow.message = `${errorToThrow.message} - Meta API Error: ${errorToThrow.response.data.error.message}`;
           }
-          throw axiosErr;
+          throw sanitizeError(errorToThrow);
         }
       },
       {
@@ -117,12 +129,15 @@ export class InstagramService {
   /**
    * Checks the processing status of an Instagram media container.
    */
-  async getContainerStatus(containerId: string): Promise<InstagramContainerStatus> {
-    const response = await this.client.get<InstagramContainerStatus>(`/${containerId}`, {
+  async getContainerStatus(context: AccountNetworkContext, containerId: string): Promise<InstagramContainerStatus> {
+    const requestConfig = {
       params: {
         fields: 'id,status_code',
       },
-    });
+      ...buildRequestConfig(context),
+    };
+
+    const response = await this.client.get<InstagramContainerStatus>(`/${containerId}`, requestConfig);
 
     // The API returns status_code as the field name in some versions
     const data = response.data as unknown as Record<string, unknown>;
@@ -142,14 +157,14 @@ export class InstagramService {
    * Waits for an Instagram container to finish processing.
    * Polls at regular intervals until FINISHED status or timeout.
    */
-  async waitForContainerReady(containerId: string): Promise<void> {
+  async waitForContainerReady(context: AccountNetworkContext, containerId: string): Promise<void> {
     logger.info('Waiting for container to be ready', { containerId });
 
     let lastStatus: InstagramStatusCode = 'IN_PROGRESS';
 
     await pollUntil(
       async () => {
-        const status = await this.getContainerStatus(containerId);
+        const status = await this.getContainerStatus(context, containerId);
         lastStatus = status.status;
 
         if (status.status === 'ERROR' || status.status === 'EXPIRED') {
@@ -172,18 +187,21 @@ export class InstagramService {
   /**
    * Publishes a media container as an Instagram Reel.
    */
-  async publishReel(accountId: string, containerId: string): Promise<InstagramPublishResponse> {
-    logger.info('Publishing Instagram Reel', { accountId, containerId });
+  async publishReel(context: AccountNetworkContext, containerId: string): Promise<InstagramPublishResponse> {
+    logger.info('Publishing Instagram Reel', { accountId: context.accountId, containerId });
 
     return withRetry(
       async () => {
         try {
+          const requestConfig = {
+            params: { creation_id: containerId },
+            ...buildRequestConfig(context),
+          };
+
           const response = await this.client.post<InstagramPublishResponse>(
-            `/${accountId}/media_publish`,
+            `/${context.accountId}/media_publish`,
             null,
-            {
-              params: { creation_id: containerId },
-            },
+            requestConfig,
           );
 
           logger.info('Reel published successfully', {
@@ -193,11 +211,11 @@ export class InstagramService {
 
           return response.data;
         } catch (err: unknown) {
-          const axiosErr = err as AxiosError<GraphApiErrorResponse>;
-          if (axiosErr.response?.data?.error?.message) {
-            axiosErr.message = `${axiosErr.message} - Meta API Error: ${axiosErr.response.data.error.message}`;
+          let errorToThrow = err as any;
+          if (errorToThrow.response?.data?.error?.message) {
+            errorToThrow.message = `${errorToThrow.message} - Meta API Error: ${errorToThrow.response.data.error.message}`;
           }
-          throw axiosErr;
+          throw sanitizeError(errorToThrow);
         }
       },
       {

@@ -199,6 +199,11 @@ export class UploadWorker {
         });
       }
 
+      const context = {
+        accountId,
+        proxyUrl: account?.proxyUrl
+      };
+
       // Instagram Graph API requires a publicly accessible URL for Reels.
       // We serve the downloaded tmp file via the /public/tmp route.
       const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
@@ -236,7 +241,7 @@ export class UploadWorker {
       let container;
       try {
         container = await instagramService.createReelContainer(
-          accountId,
+          context,
           videoUrl,
           caption,
           coverUrl,
@@ -252,7 +257,7 @@ export class UploadWorker {
             error: containerErr.message,
           });
           container = await instagramService.createReelContainer(
-            accountId,
+            context,
             videoUrl,
             caption,
             undefined,
@@ -276,14 +281,14 @@ export class UploadWorker {
 
       // ── Step 5: Poll until Instagram finishes processing ────────────────────
       t0 = Date.now();
-      await instagramService.waitForContainerReady(container.id);
+      await instagramService.waitForContainerReady(context, container.id);
       stageTimings.instagramProcessing = Date.now() - t0;
 
       // ── Step 6: Publish the Reel ────────────────────────────────────────────
       t0 = Date.now();
       await UploadJobModel.update(job.id, { status: 'PUBLISHING' });
 
-      const publishResult = await instagramService.publishReel(accountId, container.id);
+      const publishResult = await instagramService.publishReel(context, container.id);
       const instagramMediaId = publishResult.id;
 
       await UploadJobModel.update(job.id, { status: 'COMPLETED', instagramMediaId });

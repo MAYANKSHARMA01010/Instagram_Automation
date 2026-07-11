@@ -157,8 +157,14 @@ describe('UploadWorker', () => {
           job.driveFileName,
         );
         expect(ig.createReelContainer).toHaveBeenCalledTimes(1);
-        expect(ig.waitForContainerReady).toHaveBeenCalledWith('container-abc');
-        expect(ig.publishReel).toHaveBeenCalledWith('ig-account-123', 'container-abc');
+        expect(ig.waitForContainerReady).toHaveBeenCalledWith(
+          expect.objectContaining({ accountId: 'ig-account-123' }),
+          'container-abc'
+        );
+        expect(ig.publishReel).toHaveBeenCalledWith(
+          expect.objectContaining({ accountId: 'ig-account-123' }),
+          'container-abc'
+        );
         expect(getDriveService().moveToUploaded).toHaveBeenCalledTimes(1);
       });
 

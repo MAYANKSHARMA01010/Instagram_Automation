@@ -1,5 +1,6 @@
 import winston from 'winston';
 import fs from 'fs';
+import { maskSensitiveStrings } from './error-sanitizer';
 
 const logDir = process.env.LOG_DIR ?? './logs';
 const logLevel = process.env.LOG_LEVEL ?? 'info';
@@ -10,11 +11,42 @@ if (!fs.existsSync(logDir)) {
 }
 
 /**
+ * Layer 2: Custom Winston format that sanitizes any strings or stacks
+ * inside the log metadata that might contain proxy credentials.
+ */
+const sanitizeFormat = winston.format((info) => {
+  if (info.message && typeof info.message === 'string') {
+    info.message = maskSensitiveStrings(info.message);
+  }
+  if (info.stack && typeof info.stack === 'string') {
+    info.stack = maskSensitiveStrings(info.stack);
+  }
+  
+  // Clean meta fields if full request configs were accidentally logged
+  for (const key of Object.keys(info)) {
+    if (key === 'message' || key === 'level' || key === 'timestamp' || key === 'service') continue;
+    
+    if (key === 'config' && (info.config as any)?.httpsAgent) {
+      delete (info.config as any).httpsAgent;
+    }
+    if (key === 'request' && (info.request as any)?.socket) {
+      delete (info.request as any).socket;
+    }
+    
+    if (typeof info[key] === 'string') {
+      info[key] = maskSensitiveStrings(info[key]);
+    }
+  }
+  return info;
+});
+
+/**
  * Custom log format with timestamp, level, and structured message.
  */
 const logFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
+  sanitizeFormat(),
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.splat(),
   winston.format.json(),
 );
@@ -23,6 +55,8 @@ const logFormat = winston.format.combine(
  * Console format for development readability.
  */
 const consoleFormat = winston.format.combine(
+  winston.format.errors({ stack: true }),
+  sanitizeFormat(),
   winston.format.colorize(),
   winston.format.timestamp({ format: 'HH:mm:ss' }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {

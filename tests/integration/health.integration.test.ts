@@ -155,6 +155,22 @@ describe('HealthService (Integration)', () => {
     expect(dbRecord?.cooldownUntil?.getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('should trigger cooldown without reducing health score for infrastructure errors', async () => {
+    await AccountHealthModel.getOrCreate(ACCOUNT_ID);
+    await AccountHealthModel.update(ACCOUNT_ID, { healthScore: 100 });
+
+    // 'ECONNREFUSED' is an infrastructure error
+    await healthService.recordFailure(ACCOUNT_ID, 'ECONNREFUSED');
+
+    const dbRecord = await getDatabase().accountHealth.findUnique({
+      where: { instagramAccountId: ACCOUNT_ID },
+    });
+
+    expect(dbRecord?.healthScore).toBe(100); // Score remains untouched
+    expect(dbRecord?.cooldownUntil).not.toBeNull(); // Cooldown is triggered
+    expect(dbRecord?.cooldownUntil?.getTime()).toBeGreaterThan(Date.now());
+  });
+
   it('should reset cooldown via checkCooldown() once it has expired', async () => {
     await AccountHealthModel.getOrCreate(ACCOUNT_ID);
     // Set cooldown to the past

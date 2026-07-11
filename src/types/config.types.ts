@@ -84,6 +84,7 @@ export interface AccountMapping {
   cooldownHours?: number;
   postingWindowStart?: string; // e.g. "08:00"
   postingWindowEnd?: string; // e.g. "20:00"
+  proxyUrl?: string;
 }
 
 export interface Config {

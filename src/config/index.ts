@@ -67,6 +67,7 @@ function parseAccountsConfig(): AccountMapping[] {
       driveUploadedFolderId: process.env.GOOGLE_DRIVE_UPLOADED_FOLDER_ID ?? '',
       isNewAccount: process.env.IS_NEW_ACCOUNT === 'true',
       warmupStartDate: process.env.WARMUP_START_DATE,
+      proxyUrl: process.env.PROXY_URL,
     },
   ];
 }

@@ -1,6 +1,8 @@
 import { getInstagramService } from '../services/instagram.service';
 import { UploadJobModel } from '../database/repository';
 import logger from '../utils/logger';
+import { getConfig } from '../config';
+import { AccountNetworkContext } from '../types/network.types';
 
 /**
  * Status worker utility for manually checking Instagram container status.
@@ -10,7 +12,7 @@ export class StatusWorker {
   /**
    * Polls the current status of an Instagram media container.
    */
-  async checkContainerStatus(containerId: string): Promise<{
+  async checkContainerStatus(context: AccountNetworkContext, containerId: string): Promise<{
     containerId: string;
     status: string;
     isReady: boolean;
@@ -20,7 +22,7 @@ export class StatusWorker {
     logger.debug('Checking container status', { containerId });
 
     const instagramService = getInstagramService();
-    const containerStatus = await instagramService.getContainerStatus(containerId);
+    const containerStatus = await instagramService.getContainerStatus(context, containerId);
 
     const isReady = containerStatus.status === 'FINISHED';
     const isError = containerStatus.status === 'ERROR' || containerStatus.status === 'EXPIRED';
@@ -61,7 +63,11 @@ export class StatusWorker {
       if (!job.instagramContainerId) continue;
 
       try {
-        const status = await this.checkContainerStatus(job.instagramContainerId);
+        const accountId = job.instagramAccountId ?? getConfig().accounts[0].instagramAccountId;
+        const account = getConfig().accounts.find(a => a.instagramAccountId === accountId);
+        const context = { accountId, proxyUrl: account?.proxyUrl };
+
+        const status = await this.checkContainerStatus(context, job.instagramContainerId);
         results.push({
           jobId: job.id,
           fileName: job.driveFileName,

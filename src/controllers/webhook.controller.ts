@@ -86,7 +86,11 @@ export async function handleN8nStatusCheck(req: Request, res: Response): Promise
 
   try {
     const instagramService = getInstagramService();
-    const containerStatus = await instagramService.getContainerStatus(job.instagramContainerId);
+    const accountId = job.instagramAccountId ?? getConfig().accounts[0].instagramAccountId;
+    const account = getConfig().accounts.find(a => a.instagramAccountId === accountId);
+    const context = { accountId, proxyUrl: account?.proxyUrl };
+
+    const containerStatus = await instagramService.getContainerStatus(context, job.instagramContainerId);
 
     res.json({
       success: true,
@@ -128,7 +132,10 @@ export async function handleN8nPublish(req: Request, res: Response): Promise<voi
 
     const instagramService = getInstagramService();
     const accountId = job.instagramAccountId ?? getConfig().accounts[0].instagramAccountId;
-    const publishResult = await instagramService.publishReel(accountId, containerId);
+    const account = getConfig().accounts.find(a => a.instagramAccountId === accountId);
+    const context = { accountId, proxyUrl: account?.proxyUrl };
+
+    const publishResult = await instagramService.publishReel(context, containerId);
 
     await UploadJobModel.update(jobId, {
       status: 'COMPLETED',

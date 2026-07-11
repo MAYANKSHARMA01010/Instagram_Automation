@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 import { getNotificationService } from './notification.service';
 import { getConfig } from '../config';
+import { classifyError, ErrorCategory } from '../utils/error-classifier';
 
 export interface HealthState {
   healthScore: number;
@@ -72,38 +73,62 @@ export class HealthService {
   }
 
   /**
-   * Records a failure, parsing the errorMessage to penalize the score.
+   * Records a failure, using error classification to penalize the score
+   * or trigger a cooldown for infrastructure issues.
    */
   async recordFailure(accountId: string, errorMessage: string): Promise<void> {
     if (!this.config.upload.enableHealthScoring) return;
 
     const health = await this.getHealth(accountId);
     const msg = errorMessage.toLowerCase();
+    const category = classifyError(errorMessage);
 
-    let penalty = 0; // Default: No penalty for random infra/network errors
+    // Infrastructure Errors MUST NOT reduce algorithmic health score,
+    // but they should trigger a temporary queue cooldown to prevent spamming failing proxies/networks.
+    if (category === ErrorCategory.INFRASTRUCTURE) {
+      const updateData: Prisma.AccountHealthUpdateInput = {
+        failedUploads: health.failedUploads + 1,
+        lastUploadFailure: new Date(),
+        lastUploadTime: new Date(),
+      };
+
+      // Only apply cooldown if not already in one
+      if (!health.cooldownUntil || health.cooldownUntil < new Date()) {
+        const cooldownHours = 1; // Infrastructure errors get a short 1-hour pause
+        const cooldownDate = new Date(Date.now() + cooldownHours * 60 * 60 * 1000);
+        updateData.cooldownUntil = cooldownDate;
+        
+        logger.warn('Infrastructure error detected, pausing account queue', { accountId, errorMessage, cooldownDate });
+        await getNotificationService().notifyCooldownStarted(accountId, cooldownHours, health.healthScore);
+      }
+
+      await AccountHealthModel.update(accountId, updateData);
+      return; // Exit early, no health score penalty
+    }
+
+    // Platform / Rate Limit / Auth Errors
+    let penalty = 0;
     let isRestriction = false;
 
-    if (msg.includes('checkpoint_required')) {
-      penalty = 30;
-      isRestriction = true;
-    } else if (
-      msg.includes('action_blocked') ||
-      msg.includes('action blocked') ||
-      msg.includes('not permitted')
-    ) {
-      penalty = 40;
-      isRestriction = true;
-    } else if (msg.includes('challenge_required')) {
-      penalty = 25;
-      isRestriction = true;
-    } else if (msg.includes('feedback_required')) {
-      penalty = 15;
-    } else if (
-      msg.includes('login_required') ||
-      msg.includes('auth error') ||
-      msg.includes('session_expired')
-    ) {
-      penalty = 20;
+    if (category === ErrorCategory.PLATFORM || category === ErrorCategory.RATE_LIMIT || category === ErrorCategory.AUTH) {
+      if (msg.includes('checkpoint_required')) {
+        penalty = 30;
+        isRestriction = true;
+      } else if (
+        msg.includes('action_blocked') ||
+        msg.includes('action blocked') ||
+        msg.includes('not permitted')
+      ) {
+        penalty = 40;
+        isRestriction = true;
+      } else if (msg.includes('challenge_required')) {
+        penalty = 25;
+        isRestriction = true;
+      } else if (msg.includes('feedback_required')) {
+        penalty = 15;
+      } else if (category === ErrorCategory.AUTH) {
+        penalty = 20;
+      }
     }
 
     const newScore = Math.max(0, health.healthScore - penalty);
@@ -122,9 +147,8 @@ export class HealthService {
       await getNotificationService().notifyRestrictionDetected(accountId, errorMessage);
     }
 
-    // Trigger cooldown if critical
+    // Trigger long cooldown if health is critical
     if (newScore < 40 && (!health.cooldownUntil || health.cooldownUntil < new Date())) {
-      // Find the account mapping to get specific cooldown hours, else fallback to default
       const accountConfig = this.config.accounts.find((a) => a.instagramAccountId === accountId);
       const cooldownHours = accountConfig?.cooldownHours ?? this.config.upload.defaultCooldownHours;
       const cooldownDate = new Date(Date.now() + cooldownHours * 60 * 60 * 1000);

@@ -213,8 +213,14 @@ describe('E2E Pipeline Simulation', () => {
     expect(result.success).toBe(true);
     expect(getDrive().downloadFile).toHaveBeenCalledWith(job.driveFileId, job.driveFileName);
     expect(getIG().createReelContainer).toHaveBeenCalledTimes(1);
-    expect(getIG().waitForContainerReady).toHaveBeenCalledWith('container-abc');
-    expect(getIG().publishReel).toHaveBeenCalledWith('ig-account-123', 'container-abc');
+    expect(getIG().waitForContainerReady).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'ig-account-123' }),
+      'container-abc'
+    );
+    expect(getIG().publishReel).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'ig-account-123' }),
+      'container-abc'
+    );
     expect(getDrive().moveToUploaded).toHaveBeenCalledTimes(1);
     expect(getRepo().ProcessedFileModel.markProcessed).toHaveBeenCalledWith(
       expect.objectContaining({ instagramMediaId: 'media-xyz' }),

@@ -174,18 +174,25 @@ describe('HealthService', () => {
       }
     });
 
-    it('should apply no penalty for pure infrastructure/network errors', async () => {
+    it('should apply no penalty for pure infrastructure/network errors and trigger cooldown', async () => {
       mockAccountHealthModel.getOrCreate.mockResolvedValue(
         makeMockHealth({ healthScore: 80 }) as any,
       );
 
       await service.recordFailure(ACCOUNT_ID, 'ECONNRESET: network failure');
 
-      // Score unchanged (penalty = 0), update called with same score
+      // Score is omitted from update (no penalty), cooldown is applied
       expect(mockAccountHealthModel.update).toHaveBeenCalledWith(
         ACCOUNT_ID,
-        expect.objectContaining({ healthScore: 80 }),
+        expect.objectContaining({ 
+          cooldownUntil: expect.any(Date),
+          failedUploads: expect.any(Number) 
+        }),
       );
+      
+      // Ensure healthScore was NOT updated
+      const updateCallArgs = (mockAccountHealthModel.update as jest.Mock).mock.calls.find(c => c[0] === ACCOUNT_ID);
+      expect(updateCallArgs[1].healthScore).toBeUndefined();
     });
 
     it('should trigger cooldown when score drops below 40', async () => {
