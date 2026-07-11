@@ -308,6 +308,38 @@ describe('InstagramService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
+    it('should fail gracefully with a clear error when payload is empty or invalid', async () => {
+      // Return null data
+      mockGet.mockResolvedValue({ data: null });
+
+      let caught: Error | undefined;
+      try {
+        await service.waitForContainerReady(ctx, 'cont-123');
+      } catch (e) {
+        caught = e as Error;
+      }
+      
+      expect(caught).toBeDefined();
+      expect(caught!.message).toContain('Unexpected empty or invalid payload');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fail gracefully with a clear error when status_code is missing', async () => {
+      // Return payload with no status_code
+      mockGet.mockResolvedValue({ data: { id: 'cont-123' } });
+
+      let caught: Error | undefined;
+      try {
+        await service.waitForContainerReady(ctx, 'cont-123');
+      } catch (e) {
+        caught = e as Error;
+      }
+      
+      expect(caught).toBeDefined();
+      expect(caught!.message).toContain('Missing status_code');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
     it('should throw if polling exceeds statusPollTimeoutMs', async () => {
       mockGet.mockResolvedValue({ data: { status_code: 'IN_PROGRESS' } });
 

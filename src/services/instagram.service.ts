@@ -139,9 +139,16 @@ export class InstagramService {
 
     const response = await this.client.get<InstagramContainerStatus>(`/${containerId}`, requestConfig);
 
-    // The API returns status_code as the field name in some versions
+    if (!response.data || typeof response.data !== 'object') {
+      throw new Error(`Unexpected empty or invalid payload received from Instagram API for container ${containerId}`);
+    }
+
     const data = response.data as unknown as Record<string, unknown>;
-    const statusCode = (data['status_code'] ?? data['status']) as InstagramStatusCode;
+    const statusCode = (data['status_code'] ?? data['status']) as InstagramStatusCode | undefined;
+
+    if (!statusCode) {
+      throw new Error(`Missing status_code in Instagram API response for container ${containerId}`);
+    }
 
     logger.debug('Container status', { containerId, status: statusCode });
 
@@ -230,7 +237,7 @@ export class InstagramService {
    * Determines if an API error should trigger a retry.
    */
   private isRetryableApiError(error: unknown): boolean {
-    if (error instanceof AxiosError) {
+    if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const graphError = error.response?.data as GraphApiErrorResponse | undefined;
       const code = graphError?.error?.code;
