@@ -7,6 +7,7 @@ export interface AppConfig {
   nodeEnv: string;
   apiKey: string;
   publicUrl: string;
+  dryRun: boolean;
 }
 
 export interface GoogleConfig {

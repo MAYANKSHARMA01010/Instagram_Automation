@@ -16,11 +16,9 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      SQLITE_PATH: /app/data/uploads.db
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/instagram_automation?schema=public
       LOG_DIR: /app/logs
     volumes:
-      # Persist database between restarts
-      - app_database:/app/data
       # Persist logs
       - app_logs:/app/logs
       # Mount caption.txt for easy editing without rebuild
@@ -36,7 +34,34 @@ services:
     networks:
       - reels_network
     depends_on:
-      - n8n
+      db:
+        condition: service_healthy
+      n8n:
+        condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─── Database ────────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: instagram_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: instagram_automation
+    volumes:
+      - app_database:/var/lib/postgresql/data
+    networks:
+      - reels_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     logging:
       driver: "json-file"
       options:

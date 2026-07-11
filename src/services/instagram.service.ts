@@ -17,7 +17,9 @@ import { buildRequestConfig } from '../utils/proxy-agent';
  * Service for interacting with the Meta (Instagram) Graph API.
  * Handles Reel container creation, status polling, and publishing.
  */
-export class InstagramService {
+import { IInstagramPublisher } from './publisher.interface';
+
+export class InstagramService implements IInstagramPublisher {
   private client: AxiosInstance;
   private config = getConfig();
   private readonly baseUrl: string;
@@ -268,11 +270,18 @@ export class InstagramService {
 }
 
 // Singleton instance
-let instagramService: InstagramService | null = null;
+import { DryRunPublisher } from './dry-run.publisher';
 
-export function getInstagramService(): InstagramService {
+let instagramService: IInstagramPublisher | null = null;
+
+export function getInstagramService(): IInstagramPublisher {
   if (!instagramService) {
-    instagramService = new InstagramService();
+    const config = getConfig();
+    if (config.app.dryRun) {
+      instagramService = new DryRunPublisher();
+    } else {
+      instagramService = new InstagramService();
+    }
   }
   return instagramService;
 }

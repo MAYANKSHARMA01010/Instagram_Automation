@@ -83,6 +83,7 @@ export function loadConfig(): Config {
       nodeEnv: process.env.NODE_ENV ?? 'development',
       apiKey: process.env.API_KEY ?? '',
       publicUrl: process.env.PUBLIC_URL ?? '',
+      dryRun: process.env.DRY_RUN === 'true',
     },
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',
