@@ -14,7 +14,7 @@ COPY tsconfig.json ./
 COPY src/ ./src/
 
 # Generate Prisma client before building
-RUN npx prisma generate
+RUN npx prisma@5.22.0 generate
 RUN pnpm run build
 
 # ─── Production Stage ─────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 COPY prisma/ ./prisma/
 RUN pnpm install --prod --frozen-lockfile && pnpm store prune
-RUN npx prisma generate
+RUN npx prisma@5.22.0 generate
 
 # Copy compiled output from builder
 COPY --from=builder /app/dist ./dist
