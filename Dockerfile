@@ -5,11 +5,15 @@ WORKDIR /app
 
 # Install dependencies first (cached layer)
 COPY package*.json ./
-RUN npm ci --only=production=false
+RUN npm ci
 
 # Copy source and compile TypeScript
+COPY prisma/ ./prisma/
 COPY tsconfig.json ./
 COPY src/ ./src/
+
+# Generate Prisma client before building
+RUN npx prisma generate
 RUN npm run build
 
 # ─── Production Stage ─────────────────────────────────────────────────────────
@@ -26,7 +30,9 @@ WORKDIR /app
 
 # Copy only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+COPY prisma/ ./prisma/
+RUN npm ci --omit=dev && npm cache clean --force
+RUN npx prisma generate
 
 # Copy compiled output from builder
 COPY --from=builder /app/dist ./dist
