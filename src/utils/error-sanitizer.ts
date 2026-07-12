@@ -7,7 +7,7 @@ export function maskSensitiveStrings(text: string): string {
   if (!text) return text;
   
   // Mask URL credentials (e.g. http://user:pass@proxy.com)
-  let masked = text.replace(/(https?|socks5):\/\/([^:@"\s]+):([^:@"\s]+)@/gi, '$1://[REDACTED]:[REDACTED]@');
+  let masked = text.replace(/(https?|socks4|socks5|socks):\/\/([^:@"\s]+):([^:@"\s]+)@/gi, '$1://[REDACTED]:[REDACTED]@');
   
   // Mask access_token=...
   masked = masked.replace(/access_token=([^&\s]+)/gi, 'access_token=[REDACTED]');

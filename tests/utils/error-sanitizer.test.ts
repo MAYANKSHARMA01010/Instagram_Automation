@@ -19,6 +19,20 @@ describe('Error Sanitizer Security Utility', () => {
       expect(safe).toContain('socks5://[REDACTED]:[REDACTED]@127.0.0.1:1080/foo');
     });
 
+    it('masks SOCKS and SOCKS4 proxy URLs', () => {
+      const msg1 = 'Proxy error socks://admin:secret@127.0.0.1:1080';
+      const safe1 = maskSensitiveStrings(msg1);
+      expect(safe1).not.toContain('admin');
+      expect(safe1).not.toContain('secret');
+      expect(safe1).toContain('socks://[REDACTED]:[REDACTED]@127.0.0.1:1080');
+
+      const msg2 = 'Proxy error socks4://admin:secret@127.0.0.1:1080';
+      const safe2 = maskSensitiveStrings(msg2);
+      expect(safe2).not.toContain('admin');
+      expect(safe2).not.toContain('secret');
+      expect(safe2).toContain('socks4://[REDACTED]:[REDACTED]@127.0.0.1:1080');
+    });
+
     it('masks access tokens', () => {
       const msg = 'Graph API Error for access_token=EAAGm0PX4ZC... and other details';
       const safe = maskSensitiveStrings(msg);
