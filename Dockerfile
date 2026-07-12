@@ -4,8 +4,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (cached layer)
-COPY package*.json ./
-RUN npm ci
+RUN npm install -g pnpm
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source and compile TypeScript
 COPY prisma/ ./prisma/
@@ -14,7 +15,7 @@ COPY src/ ./src/
 
 # Generate Prisma client before building
 RUN npx prisma generate
-RUN npm run build
+RUN pnpm run build
 
 # ─── Production Stage ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS production
@@ -29,9 +30,10 @@ RUN addgroup -g 1001 -S nodejs && \
 WORKDIR /app
 
 # Copy only production dependencies
-COPY package*.json ./
+RUN npm install -g pnpm
+COPY package.json pnpm-lock.yaml ./
 COPY prisma/ ./prisma/
-RUN npm ci --omit=dev && npm cache clean --force
+RUN pnpm install --prod --frozen-lockfile && pnpm store prune
 RUN npx prisma generate
 
 # Copy compiled output from builder
