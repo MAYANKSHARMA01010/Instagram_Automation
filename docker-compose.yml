@@ -11,7 +11,7 @@ services:
     container_name: instagram_reels_uploader
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "3005:3000"
     env_file:
       - .env
     environment:

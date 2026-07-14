@@ -55,3 +55,13 @@ The platform supports multi-account processing.
 - `MAX_UPLOADS_PER_DAY` (Optional): Safe limit for uploads to prevent API spam flags (default: `5`).
 - `MAX_RETRY_ATTEMPTS` (Optional): Maximum times a failed video upload will retry (default: `3`).
 - `MAX_CONCURRENT_UPLOADS` (Optional): Number of videos to process simultaneously across accounts (default: `1`).
+
+## Testing & Environment
+
+- `DRY_RUN` (Optional): Set to `true` to run the application in a safe staging mode. 
+  > [!IMPORTANT]
+  > **DRY_RUN Behavior:**
+  > - Simulates the full production workflow exactly as it would run in production.
+  > - Skips all Meta Graph API requests (preventing actual Instagram posts).
+  > - **Side Effects:** Videos *are* still moved to the Google Drive "Uploaded" folder to test the full lifecycle. If you wish to re-test the same video, you must manually move it back to the source folder in Google Drive.
+  > - Emits actual Telegram notifications and updates the Postgres database (e.g. `UploadJobModel`).

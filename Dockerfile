@@ -4,6 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (cached layer)
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -20,8 +21,8 @@ RUN pnpm run build
 # ─── Production Stage ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling and openssl for Prisma
+RUN apk add --no-cache dumb-init openssl
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \

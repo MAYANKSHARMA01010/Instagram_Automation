@@ -13,7 +13,7 @@ echo -e "${YELLOW}Starting Automated Smoke Tests...${NC}"
 sleep 10
 
 echo -e "${YELLOW}1. HTTP Health Check${NC}"
-HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health || echo "FAILED")
+HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3005/health || echo "FAILED")
 if [ "$HEALTH_STATUS" = "200" ]; then
     echo -e "${GREEN}✓ HTTP /health returned 200 OK${NC}"
 else
