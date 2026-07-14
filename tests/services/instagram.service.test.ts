@@ -31,11 +31,13 @@ jest.mock('../../src/config', () => ({
 
 jest.mock('../../src/utils/proxy-agent', () => ({
   buildRequestConfig: jest.fn((ctx) => {
-    if (ctx.proxyUrl) {
+    if (ctx?.proxyUrl) {
       return { httpsAgent: { isMockAgent: true }, proxy: false };
     }
     return {};
   }),
+  reportProxySuccess: jest.fn(),
+  reportProxyTimeout: jest.fn(),
 }));
 
 const mockPost = jest.fn();

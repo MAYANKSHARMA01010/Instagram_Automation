@@ -16,6 +16,10 @@ export function classifyError(error: unknown): ErrorCategory {
   const code = (error as any)?.code?.toLowerCase() ?? '';
 
   // 1. Infrastructure Errors (Proxy, DNS, Socket, TCP)
+  if ((error as any)?.isInfrastructureError) {
+    return ErrorCategory.INFRASTRUCTURE;
+  }
+  
   const infraKeywords = [
     'econnrefused',
     'econnreset',
