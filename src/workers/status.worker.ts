@@ -12,7 +12,10 @@ export class StatusWorker {
   /**
    * Polls the current status of an Instagram media container.
    */
-  async checkContainerStatus(context: AccountNetworkContext, containerId: string): Promise<{
+  async checkContainerStatus(
+    context: AccountNetworkContext,
+    containerId: string,
+  ): Promise<{
     containerId: string;
     status: string;
     isReady: boolean;
@@ -64,7 +67,7 @@ export class StatusWorker {
 
       try {
         const accountId = job.instagramAccountId ?? getConfig().accounts[0].instagramAccountId;
-        const account = getConfig().accounts.find(a => a.instagramAccountId === accountId);
+        const account = getConfig().accounts.find((a) => a.instagramAccountId === accountId);
         const context = { accountId, proxyUrl: account?.proxyUrl };
 
         const status = await this.checkContainerStatus(context, job.instagramContainerId);

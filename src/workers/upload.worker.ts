@@ -201,7 +201,7 @@ export class UploadWorker {
 
       const context = {
         accountId,
-        proxyUrl: account?.proxyUrl
+        proxyUrl: account?.proxyUrl,
       };
 
       // Instagram Graph API requires a publicly accessible URL for Reels.

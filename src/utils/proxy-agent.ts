@@ -1,6 +1,6 @@
-// @ts-ignore
+// @ts-expect-error - https-proxy-agent lacks types here
 import { HttpsProxyAgent } from 'https-proxy-agent';
-// @ts-ignore
+// @ts-expect-error - socks-proxy-agent lacks types here
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { AccountNetworkContext } from '../types/network.types';
 import { AxiosRequestConfig } from 'axios';
@@ -24,7 +24,9 @@ const STALE_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
 
 export function getProxyMetrics() {
-  let active = 0, open = 0, halfOpen = 0;
+  let active = 0,
+    open = 0,
+    halfOpen = 0;
   for (const p of agentCache.values()) {
     if (p.state === 'CLOSED') active++;
     else if (p.state === 'OPEN') open++;
@@ -37,7 +39,11 @@ function createAgent(proxyUrl: string): any {
   const urlLower = proxyUrl.toLowerCase();
   if (urlLower.startsWith('http://') || urlLower.startsWith('https://')) {
     return new HttpsProxyAgent(proxyUrl);
-  } else if (urlLower.startsWith('socks5://') || urlLower.startsWith('socks://') || urlLower.startsWith('socks4://')) {
+  } else if (
+    urlLower.startsWith('socks5://') ||
+    urlLower.startsWith('socks://') ||
+    urlLower.startsWith('socks4://')
+  ) {
     return new SocksProxyAgent(proxyUrl);
   }
   throw new Error(`Unsupported proxy protocol for URL: ${proxyUrl}.`);
@@ -62,17 +68,18 @@ export function buildRequestConfig(context?: AccountNetworkContext): Partial<Axi
     if (now - cached.createdAt > STALE_AGE_MS) {
       if (typeof cached.agent.destroy === 'function') cached.agent.destroy();
       cached = undefined;
-    } 
+    }
     // 2. Circuit Breaker Enforcement
     else if (cached.state === 'HALF_OPEN') {
       if (cached.probeInFlight) {
-        const err = new Error(`Proxy circuit breaker HALF_OPEN (probe in flight) for ${proxyUrl}`) as any;
+        const err = new Error(
+          `Proxy circuit breaker HALF_OPEN (probe in flight) for ${proxyUrl}`,
+        ) as any;
         err.code = 'ECONNABORTED'; // Treat as infrastructure error
         throw err;
       }
       cached.probeInFlight = true;
-    }
-    else if (cached.state === 'OPEN') {
+    } else if (cached.state === 'OPEN') {
       if (cached.cooldownUntil && now > cached.cooldownUntil) {
         cached.state = 'HALF_OPEN';
         cached.probeInFlight = true;
@@ -91,7 +98,7 @@ export function buildRequestConfig(context?: AccountNetworkContext): Partial<Axi
       consecutiveTimeouts: 0,
       createdAt: now,
       lastUsedAt: now,
-      state: 'CLOSED'
+      state: 'CLOSED',
     };
     agentCache.set(proxyUrl, cached);
   }

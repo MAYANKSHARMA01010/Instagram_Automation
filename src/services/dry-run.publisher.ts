@@ -7,7 +7,7 @@ import {
 } from '../types/instagram.types';
 import logger from '../utils/logger';
 export class DryRunPublisher implements IInstagramPublisher {
-  async getContainerStatus(
+  getContainerStatus(
     context: AccountNetworkContext,
     containerId: string,
   ): Promise<InstagramContainerStatus> {
@@ -15,11 +15,11 @@ export class DryRunPublisher implements IInstagramPublisher {
       accountId: context.accountId,
       containerId,
     });
-    
-    return {
+
+    return Promise.resolve({
       status: 'FINISHED',
       id: containerId,
-    };
+    });
   }
   async createReelContainer(
     context: AccountNetworkContext,
@@ -43,10 +43,7 @@ export class DryRunPublisher implements IInstagramPublisher {
     };
   }
 
-  async waitForContainerReady(
-    context: AccountNetworkContext,
-    containerId: string,
-  ): Promise<void> {
+  async waitForContainerReady(context: AccountNetworkContext, containerId: string): Promise<void> {
     logger.info('DRY RUN: waitForContainerReady called', {
       accountId: context.accountId,
       containerId,

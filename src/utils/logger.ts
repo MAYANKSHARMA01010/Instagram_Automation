@@ -21,18 +21,18 @@ const sanitizeFormat = winston.format((info) => {
   if (info.stack && typeof info.stack === 'string') {
     info.stack = maskSensitiveStrings(info.stack);
   }
-  
+
   // Clean meta fields if full request configs were accidentally logged
   for (const key of Object.keys(info)) {
     if (key === 'message' || key === 'level' || key === 'timestamp' || key === 'service') continue;
-    
+
     if (key === 'config' && (info.config as any)?.httpsAgent) {
       delete (info.config as any).httpsAgent;
     }
     if (key === 'request' && (info.request as any)?.socket) {
       delete (info.request as any).socket;
     }
-    
+
     if (typeof info[key] === 'string') {
       info[key] = maskSensitiveStrings(info[key]);
     }

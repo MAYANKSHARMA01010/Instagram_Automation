@@ -12,14 +12,17 @@ export enum ErrorCategory {
  * Reusable utility that prevents scattering string checks.
  */
 export function classifyError(error: unknown): ErrorCategory {
-  const message = typeof error === 'string' ? error.toLowerCase() : (error as Error)?.message?.toLowerCase() ?? '';
+  const message =
+    typeof error === 'string'
+      ? error.toLowerCase()
+      : ((error as Error)?.message?.toLowerCase() ?? '');
   const code = (error as any)?.code?.toLowerCase() ?? '';
 
   // 1. Infrastructure Errors (Proxy, DNS, Socket, TCP)
   if ((error as any)?.isInfrastructureError) {
     return ErrorCategory.INFRASTRUCTURE;
   }
-  
+
   const infraKeywords = [
     'econnrefused',
     'econnreset',

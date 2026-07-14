@@ -5,20 +5,29 @@ import axios, { AxiosError } from 'axios';
  */
 export function maskSensitiveStrings(text: string): string {
   if (!text) return text;
-  
+
   // Mask URL credentials (e.g. http://user:pass@proxy.com)
-  let masked = text.replace(/(https?|socks4|socks5|socks):\/\/([^:@"\s]+):([^:@"\s]+)@/gi, '$1://[REDACTED]:[REDACTED]@');
-  
+  let masked = text.replace(
+    /(https?|socks4|socks5|socks):\/\/([^:@"\s]+):([^:@"\s]+)@/gi,
+    '$1://[REDACTED]:[REDACTED]@',
+  );
+
   // Mask access_token=...
   masked = masked.replace(/access_token=([^&\s]+)/gi, 'access_token=[REDACTED]');
-  
+
   // Mask Bearer tokens
   masked = masked.replace(/Bearer\s+([A-Za-z0-9\-_~+/]+)/gi, 'Bearer [REDACTED]');
-  
+
   return masked;
 }
 
-const SENSITIVE_HEADERS = ['authorization', 'cookie', 'set-cookie', 'x-api-key', 'proxy-authorization'];
+const SENSITIVE_HEADERS = [
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'proxy-authorization',
+];
 
 function sanitizeHeaders(headers: any): any {
   if (!headers) return headers;
@@ -33,7 +42,7 @@ function sanitizeHeaders(headers: any): any {
 
 function sanitizeAxiosConfig(config: any): any {
   if (!config) return config;
-  
+
   // Start with a minimal safe config to avoid copying circular references or functions
   const safeConfig: any = {
     url: maskSensitiveStrings(config.url),
@@ -42,22 +51,26 @@ function sanitizeAxiosConfig(config: any): any {
     timeout: config.timeout,
     maxRedirects: config.maxRedirects,
   };
-  
+
   if (config.headers) {
     safeConfig.headers = sanitizeHeaders(config.headers);
   }
-  
+
   // Clean URL params (e.g. access_token)
   if (config.params) {
     const safeParams = { ...config.params };
     for (const key of Object.keys(safeParams)) {
-      if (key.toLowerCase().includes('token') || key.toLowerCase().includes('key') || key.toLowerCase().includes('secret')) {
+      if (
+        key.toLowerCase().includes('token') ||
+        key.toLowerCase().includes('key') ||
+        key.toLowerCase().includes('secret')
+      ) {
         safeParams[key] = '[REDACTED]';
       }
     }
     safeConfig.params = safeParams;
   }
-  
+
   return safeConfig;
 }
 
@@ -71,7 +84,7 @@ export function sanitizeAxiosError(error: AxiosError): Error {
   safeError.code = error.code;
   safeError.isAxiosError = true;
   safeError.stack = error.stack ? maskSensitiveStrings(error.stack) : undefined;
-  
+
   if (error.response) {
     safeError.response = {
       status: error.response.status,
@@ -81,11 +94,11 @@ export function sanitizeAxiosError(error: AxiosError): Error {
       config: sanitizeAxiosConfig(error.response.config),
     };
   }
-  
+
   if (error.config) {
     safeError.config = sanitizeAxiosConfig(error.config);
   }
-  
+
   if (error.request) {
     // The underlying HTTP request object (ClientRequest). Too dangerous to keep (has socket/TLS).
     safeError.request = {
@@ -94,7 +107,7 @@ export function sanitizeAxiosError(error: AxiosError): Error {
       _sanitized: true,
     };
   }
-  
+
   return safeError;
 }
 
@@ -106,11 +119,11 @@ export function sanitizeAxiosError(error: AxiosError): Error {
 export function sanitizeError(error: unknown): Error {
   if (!error) return new Error('Unknown error');
   if (typeof error === 'string') return new Error(maskSensitiveStrings(error));
-  
+
   if (axios.isAxiosError(error)) {
     return sanitizeAxiosError(error);
   }
-  
+
   if (error instanceof Error) {
     // Basic error, try to strip sensitive strings if present in message/stack
     const safeError = new Error(maskSensitiveStrings(error.message));
@@ -118,7 +131,7 @@ export function sanitizeError(error: unknown): Error {
     safeError.stack = error.stack ? maskSensitiveStrings(error.stack) : undefined;
     return safeError;
   }
-  
+
   // For unknown objects, try to stringify safely
   let stringified;
   try {
