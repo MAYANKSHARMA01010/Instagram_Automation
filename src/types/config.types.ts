@@ -55,7 +55,6 @@ export interface UploadConfig {
 }
 
 export interface DatabaseConfig {
-  sqlitePath: string;
   databaseUrl?: string;
 }
 

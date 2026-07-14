@@ -124,7 +124,6 @@ export function loadConfig(): Config {
       postingWindowEnd: process.env.POSTING_WINDOW_END ?? '22:00',
     },
     database: {
-      sqlitePath: path.resolve(process.cwd(), process.env.SQLITE_PATH ?? './database/uploads.db'),
       databaseUrl: process.env.DATABASE_URL,
     },
     telegram: {

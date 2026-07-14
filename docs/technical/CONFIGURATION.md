@@ -43,7 +43,8 @@ The platform supports multi-account processing.
   {
     "driveFolderId": "1A2b3C4d5E...",
     "driveUploadedFolderId": "5E4d3C2b1A...",
-    "instagramAccountId": "178414XXXXXXX"
+    "instagramAccountId": "178414XXXXXXX",
+    "proxyUrl": "socks5://user:pass@host:port"
   }
 ]
 ```
