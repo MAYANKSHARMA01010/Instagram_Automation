@@ -159,7 +159,7 @@ export class UploadQueue extends EventEmitter {
       this.processingSet.add(nextJob.id);
       return nextJob;
     }
-    
+
     return null;
   }
 

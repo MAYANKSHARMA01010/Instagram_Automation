@@ -56,7 +56,7 @@ export class InstagramService implements IInstagramPublisher {
             fbtraceId: graphError.fbtraceId,
           });
         }
-        
+
         // Layer 1: Sanitize at the network boundary
         const safeError = sanitizeError(error);
         return Promise.reject(safeError);
@@ -66,9 +66,13 @@ export class InstagramService implements IInstagramPublisher {
 
   private handleNetworkError(error: unknown, context: AccountNetworkContext): Error {
     const errorToThrow = error as any;
-    
+
     // Classify infrastructure errors
-    if (axios.isCancel(errorToThrow) || errorToThrow.name === 'TimeoutError' || errorToThrow.message?.includes('Timeout')) {
+    if (
+      axios.isCancel(errorToThrow) ||
+      errorToThrow.name === 'TimeoutError' ||
+      errorToThrow.message?.includes('Timeout')
+    ) {
       errorToThrow.isInfrastructureError = true;
       errorToThrow.infrastructureSubtype = 'ABORT_TIMEOUT';
       reportProxyTimeout(context.proxyUrl);
@@ -84,7 +88,10 @@ export class InstagramService implements IInstagramPublisher {
       errorToThrow.isInfrastructureError = true;
       errorToThrow.infrastructureSubtype = 'ECONNREFUSED';
       reportProxyTimeout(context.proxyUrl);
-    } else if (errorToThrow.message?.includes('socket hang up') || errorToThrow.message?.includes('connect ETIMEDOUT')) {
+    } else if (
+      errorToThrow.message?.includes('socket hang up') ||
+      errorToThrow.message?.includes('connect ETIMEDOUT')
+    ) {
       errorToThrow.isInfrastructureError = true;
       errorToThrow.infrastructureSubtype = 'CONNECT_TIMEOUT';
       reportProxyTimeout(context.proxyUrl);
@@ -150,7 +157,7 @@ export class InstagramService implements IInstagramPublisher {
             signal: AbortSignal.timeout(60_000),
             ...buildRequestConfig(context),
           };
-          
+
           const response = await this.client.post<InstagramContainerCreateResponse>(
             `/${context.accountId}/media`,
             null,
@@ -175,7 +182,10 @@ export class InstagramService implements IInstagramPublisher {
   /**
    * Checks the processing status of an Instagram media container.
    */
-  async getContainerStatus(context: AccountNetworkContext, containerId: string): Promise<InstagramContainerStatus> {
+  async getContainerStatus(
+    context: AccountNetworkContext,
+    containerId: string,
+  ): Promise<InstagramContainerStatus> {
     const requestConfig = {
       params: {
         fields: 'id,status_code',
@@ -185,32 +195,39 @@ export class InstagramService implements IInstagramPublisher {
     };
 
     try {
-      const response = await this.client.get<InstagramContainerStatus>(`/${containerId}`, requestConfig);
+      const response = await this.client.get<InstagramContainerStatus>(
+        `/${containerId}`,
+        requestConfig,
+      );
       reportProxySuccess(context.proxyUrl);
-      
+
       if (!response.data || typeof response.data !== 'object') {
-        throw new Error(`Unexpected empty or invalid payload received from Instagram API for container ${containerId}`);
+        throw new Error(
+          `Unexpected empty or invalid payload received from Instagram API for container ${containerId}`,
+        );
       }
 
-    const data = response.data as unknown as Record<string, unknown>;
-    const statusCode = (data['status_code'] ?? data['status']) as InstagramStatusCode | undefined;
+      const data = response.data as unknown as Record<string, unknown>;
+      const statusCode = (data['status_code'] ?? data['status']) as InstagramStatusCode | undefined;
 
-    if (!statusCode) {
-      throw new Error(`Missing status_code in Instagram API response for container ${containerId}`);
+      if (!statusCode) {
+        throw new Error(
+          `Missing status_code in Instagram API response for container ${containerId}`,
+        );
+      }
+
+      logger.debug('Container status', { containerId, status: statusCode });
+
+      return {
+        id: containerId,
+        status: statusCode,
+        errorCode: data['error_code'] as number | undefined,
+        errorMessage: data['error_message'] as string | undefined,
+      };
+    } catch (err) {
+      throw this.handleNetworkError(err, context);
     }
-
-    logger.debug('Container status', { containerId, status: statusCode });
-
-    return {
-      id: containerId,
-      status: statusCode,
-      errorCode: data['error_code'] as number | undefined,
-      errorMessage: data['error_message'] as string | undefined,
-    };
-  } catch (err) {
-    throw this.handleNetworkError(err, context);
   }
-}
 
   /**
    * Waits for an Instagram container to finish processing.
@@ -246,7 +263,10 @@ export class InstagramService implements IInstagramPublisher {
   /**
    * Publishes a media container as an Instagram Reel.
    */
-  async publishReel(context: AccountNetworkContext, containerId: string): Promise<InstagramPublishResponse> {
+  async publishReel(
+    context: AccountNetworkContext,
+    containerId: string,
+  ): Promise<InstagramPublishResponse> {
     logger.info('Publishing Instagram Reel', { accountId: context.accountId, containerId });
 
     let recoveryAttempted = false;
@@ -275,20 +295,27 @@ export class InstagramService implements IInstagramPublisher {
           return response.data;
         } catch (err: unknown) {
           const processedErr = this.handleNetworkError(err, context);
-          
+
           // Publish Idempotency: Bounded Recovery
           if (!recoveryAttempted && (processedErr as any).isInfrastructureError) {
-             recoveryAttempted = true;
-             logger.warn('Network error during publishReel, attempting to verify if published...', { containerId });
-             try {
-               const status = await this.getContainerStatus(context, containerId);
-               if (status.status === 'PUBLISHED') {
-                  logger.info('Container was actually published successfully despite network error.', { containerId });
-                  return { id: `recovered-${containerId}` } as InstagramPublishResponse;
-               }
-             } catch (statusErr) {
-               logger.warn('Failed to recover container status after publish timeout', { containerId });
-             }
+            recoveryAttempted = true;
+            logger.warn('Network error during publishReel, attempting to verify if published...', {
+              containerId,
+            });
+            try {
+              const status = await this.getContainerStatus(context, containerId);
+              if (status.status === 'PUBLISHED') {
+                logger.info(
+                  'Container was actually published successfully despite network error.',
+                  { containerId },
+                );
+                return { id: `recovered-${containerId}` } as InstagramPublishResponse;
+              }
+            } catch (statusErr) {
+              logger.warn('Failed to recover container status after publish timeout', {
+                containerId,
+              });
+            }
           }
           throw processedErr;
         }

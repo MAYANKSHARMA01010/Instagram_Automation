@@ -97,9 +97,17 @@ export class HealthService {
         const cooldownHours = 1; // Infrastructure errors get a short 1-hour pause
         const cooldownDate = new Date(Date.now() + cooldownHours * 60 * 60 * 1000);
         updateData.cooldownUntil = cooldownDate;
-        
-        logger.warn('Infrastructure error detected, pausing account queue', { accountId, errorMessage, cooldownDate });
-        await getNotificationService().notifyCooldownStarted(accountId, cooldownHours, health.healthScore);
+
+        logger.warn('Infrastructure error detected, pausing account queue', {
+          accountId,
+          errorMessage,
+          cooldownDate,
+        });
+        await getNotificationService().notifyCooldownStarted(
+          accountId,
+          cooldownHours,
+          health.healthScore,
+        );
       }
 
       await AccountHealthModel.update(accountId, updateData);
@@ -110,7 +118,11 @@ export class HealthService {
     let penalty = 0;
     let isRestriction = false;
 
-    if (category === ErrorCategory.PLATFORM || category === ErrorCategory.RATE_LIMIT || category === ErrorCategory.AUTH) {
+    if (
+      category === ErrorCategory.PLATFORM ||
+      category === ErrorCategory.RATE_LIMIT ||
+      category === ErrorCategory.AUTH
+    ) {
       if (msg.includes('checkpoint_required')) {
         penalty = 30;
         isRestriction = true;

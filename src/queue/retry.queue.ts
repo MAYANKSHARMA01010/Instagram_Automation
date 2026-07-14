@@ -92,10 +92,10 @@ export class RetryQueue {
     for (const entry of ready) {
       const accountId = entry.job.instagramAccountId;
       if (accountId && (await healthService.checkCooldown(accountId))) {
-         // Skip, but we must put it back into the queue!
-         entry.nextRetryAt = new Date(Date.now() + 60 * 1000); // Check again in 60 seconds
-         this.retryEntries.push(entry);
-         continue;
+        // Skip, but we must put it back into the queue!
+        entry.nextRetryAt = new Date(Date.now() + 60 * 1000); // Check again in 60 seconds
+        this.retryEntries.push(entry);
+        continue;
       }
       // Update retry count in DB
       await UploadJobModel.update(entry.job.id, {
