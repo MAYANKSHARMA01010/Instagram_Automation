@@ -83,13 +83,20 @@ export class RetryQueue {
   private async processRetries(onRetry: (job: UploadJob, attempt: number) => void): Promise<void> {
     const now = new Date();
     const ready = this.retryEntries.filter((e) => e.nextRetryAt <= now);
-
     if (ready.length === 0) return;
 
-    // Remove ready entries from the queue
     this.retryEntries = this.retryEntries.filter((e) => e.nextRetryAt > now);
 
+    const healthService = (await import('../services/health.service')).getHealthService();
+
     for (const entry of ready) {
+      const accountId = entry.job.instagramAccountId;
+      if (accountId && (await healthService.checkCooldown(accountId))) {
+         // Skip, but we must put it back into the queue!
+         entry.nextRetryAt = new Date(Date.now() + 60 * 1000); // Check again in 60 seconds
+         this.retryEntries.push(entry);
+         continue;
+      }
       // Update retry count in DB
       await UploadJobModel.update(entry.job.id, {
         status: 'PENDING',

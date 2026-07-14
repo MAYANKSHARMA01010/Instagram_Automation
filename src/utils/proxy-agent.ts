@@ -14,6 +14,7 @@ export interface CachedProxyAgent {
   lastUsedAt: number;
   state: CircuitState;
   cooldownUntil?: number;
+  probeInFlight?: boolean;
 }
 
 // Cache by proxy URL to reuse agents across jobs
@@ -63,9 +64,18 @@ export function buildRequestConfig(context?: AccountNetworkContext): Partial<Axi
       cached = undefined;
     } 
     // 2. Circuit Breaker Enforcement
+    else if (cached.state === 'HALF_OPEN') {
+      if (cached.probeInFlight) {
+        const err = new Error(`Proxy circuit breaker HALF_OPEN (probe in flight) for ${proxyUrl}`) as any;
+        err.code = 'ECONNABORTED'; // Treat as infrastructure error
+        throw err;
+      }
+      cached.probeInFlight = true;
+    }
     else if (cached.state === 'OPEN') {
       if (cached.cooldownUntil && now > cached.cooldownUntil) {
         cached.state = 'HALF_OPEN';
+        cached.probeInFlight = true;
         cached.agent = createAgent(proxyUrl);
       } else {
         const err = new Error(`Proxy circuit breaker OPEN for ${proxyUrl}`) as any;
@@ -104,6 +114,7 @@ export function reportProxySuccess(proxyUrl?: string) {
     cached.consecutiveTimeouts = 0;
     if (cached.state === 'HALF_OPEN') {
       cached.state = 'CLOSED';
+      cached.probeInFlight = false;
     }
   }
 }
@@ -116,7 +127,12 @@ export function reportProxyTimeout(proxyUrl?: string) {
   const cached = agentCache.get(proxyUrl);
   if (cached) {
     cached.consecutiveTimeouts++;
-    if (cached.consecutiveTimeouts >= 3 && cached.state !== 'OPEN') {
+    if (cached.state === 'HALF_OPEN') {
+      cached.state = 'OPEN';
+      cached.probeInFlight = false;
+      cached.cooldownUntil = Date.now() + COOLDOWN_MS;
+      if (typeof cached.agent.destroy === 'function') cached.agent.destroy();
+    } else if (cached.consecutiveTimeouts >= 3 && cached.state !== 'OPEN') {
       cached.state = 'OPEN';
       cached.cooldownUntil = Date.now() + COOLDOWN_MS;
       if (typeof cached.agent.destroy === 'function') cached.agent.destroy();

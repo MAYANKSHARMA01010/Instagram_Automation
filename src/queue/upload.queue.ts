@@ -140,6 +140,8 @@ export class UploadQueue extends EventEmitter {
 
     if (availableJobs.length === 0) return null;
 
+    const healthService = (await import('../services/health.service')).getHealthService();
+
     // Group jobs by account so they don't interleave
     availableJobs.sort((a, b) => {
       const accountA = a.instagramAccountId || '';
@@ -149,9 +151,16 @@ export class UploadQueue extends EventEmitter {
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
 
-    const nextJob = availableJobs[0];
-    this.processingSet.add(nextJob.id);
-    return nextJob;
+    for (const nextJob of availableJobs) {
+      const accountId = nextJob.instagramAccountId;
+      if (accountId && (await healthService.checkCooldown(accountId))) {
+        continue;
+      }
+      this.processingSet.add(nextJob.id);
+      return nextJob;
+    }
+    
+    return null;
   }
 
   async countPending(): Promise<number> {

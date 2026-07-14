@@ -101,6 +101,12 @@ export class InstagramService implements IInstagramPublisher {
     if (errorToThrow.response?.data?.error?.message) {
       errorToThrow.message = `${errorToThrow.message} - Meta API Error: ${errorToThrow.response.data.error.message}`;
     }
+
+    // Any valid HTTP response proves the proxy is alive, even if it's a 4xx/5xx API error
+    if (errorToThrow.response && !errorToThrow.isInfrastructureError) {
+      reportProxySuccess(context.proxyUrl);
+    }
+
     return sanitizeError(errorToThrow);
   }
 
@@ -243,6 +249,8 @@ export class InstagramService implements IInstagramPublisher {
   async publishReel(context: AccountNetworkContext, containerId: string): Promise<InstagramPublishResponse> {
     logger.info('Publishing Instagram Reel', { accountId: context.accountId, containerId });
 
+    let recoveryAttempted = false;
+
     return withRetry(
       async () => {
         try {
@@ -269,7 +277,8 @@ export class InstagramService implements IInstagramPublisher {
           const processedErr = this.handleNetworkError(err, context);
           
           // Publish Idempotency: Bounded Recovery
-          if ((processedErr as any).isInfrastructureError) {
+          if (!recoveryAttempted && (processedErr as any).isInfrastructureError) {
+             recoveryAttempted = true;
              logger.warn('Network error during publishReel, attempting to verify if published...', { containerId });
              try {
                const status = await this.getContainerStatus(context, containerId);
