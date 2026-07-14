@@ -16,6 +16,12 @@ jest.mock('../../src/database/repository', () => ({
   },
 }));
 
+jest.mock('../../src/services/health.service', () => ({
+  getHealthService: jest.fn(() => ({
+    checkCooldown: jest.fn().mockResolvedValue(false)
+  }))
+}));
+
 jest.mock('../../src/config', () => ({
   getConfig: jest.fn(() => ({
     upload: {
@@ -114,10 +120,11 @@ describe('RetryQueue', () => {
       const onRetry = jest.fn();
       retryQueue.start(onRetry);
 
-      // Advance past the retry delay
       jest.advanceTimersByTime(11_000); // 10s interval + 1s to make entry due
       await Promise.resolve();
       await Promise.resolve(); // Flush the promise inside setInterval
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(mockUploadJobModel.update).toHaveBeenCalledWith(
         job.id,
@@ -141,6 +148,8 @@ describe('RetryQueue', () => {
       retryQueue.start(onRetry);
 
       jest.advanceTimersByTime(15_000);
+      await Promise.resolve();
+      await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
 

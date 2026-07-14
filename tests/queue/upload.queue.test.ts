@@ -5,8 +5,9 @@
  *        cancelJobsForAccount, dequeueNext ordering.
  */
 import { UploadQueue } from '../../src/queue/upload.queue';
-import { UploadJobModel, ProcessedFileModel } from '../../src/database/repository';
+import { UploadJobModel, ProcessedFileModel, AccountHealthModel } from '../../src/database/repository';
 import { makeMockJob } from '../fixtures';
+import { getHealthService } from '../../src/services/health.service';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,15 @@ jest.mock('../../src/database/repository', () => ({
   ProcessedFileModel: {
     isProcessed: jest.fn(),
   },
+  AccountHealthModel: {
+    getOrCreate: jest.fn().mockResolvedValue({ healthScore: 100 }),
+  },
+}));
+
+jest.mock('../../src/services/health.service', () => ({
+  getHealthService: jest.fn(() => ({
+    checkCooldown: jest.fn().mockResolvedValue(false)
+  }))
 }));
 
 jest.mock('../../src/config/database', () => ({

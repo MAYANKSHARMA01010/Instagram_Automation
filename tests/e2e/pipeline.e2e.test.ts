@@ -364,6 +364,8 @@ describe('E2E Pipeline Simulation', () => {
     jest.advanceTimersByTime(15_000);
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({ id: failedJob.id }), 1);
     expect(retryQueue.getPendingCount()).toBe(0);
