@@ -5,9 +5,8 @@
  *        cancelJobsForAccount, dequeueNext ordering.
  */
 import { UploadQueue } from '../../src/queue/upload.queue';
-import { UploadJobModel, ProcessedFileModel, AccountHealthModel } from '../../src/database/repository';
+import { UploadJobModel, ProcessedFileModel } from '../../src/database/repository';
 import { makeMockJob } from '../fixtures';
-import { getHealthService } from '../../src/services/health.service';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +56,7 @@ function makeDriveFile(id = 'drive-file-001', name = 'test-video.mp4') {
     name,
     mimeType: 'video/mp4',
     size: '100000',
+    createdTime: new Date().toISOString(),
     modifiedTime: new Date().toISOString(),
   };
 }

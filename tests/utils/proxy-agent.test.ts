@@ -15,8 +15,6 @@ jest.mock('socks-proxy-agent', () => {
 });
 
 import { buildRequestConfig, clearAgentCache } from '../../src/utils/proxy-agent';
-import { HttpsProxyAgent } from 'https-proxy-agent';
-import { SocksProxyAgent } from 'socks-proxy-agent';
 
 describe('Proxy Agent Utility', () => {
   beforeEach(() => {
@@ -35,7 +33,7 @@ describe('Proxy Agent Utility', () => {
 
   it('should create HttpsProxyAgent for http:// URL', () => {
     const config = buildRequestConfig({ accountId: 'acc-1', proxyUrl: 'http://my-proxy:8080' });
-    expect(config.httpsAgent).toBeInstanceOf(HttpsProxyAgent);
+    expect(config.httpsAgent?.constructor.name).toBe('HttpsProxyAgent');
     expect(config.proxy).toBe(false); // Axios default proxy disabled
   });
 

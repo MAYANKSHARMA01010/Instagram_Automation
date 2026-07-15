@@ -111,6 +111,7 @@ describe('UploadQueue (Integration)', () => {
       name: 'integration.mp4',
       mimeType: 'video/mp4',
       size: '1000',
+      createdTime: new Date().toISOString(),
       modifiedTime: new Date().toISOString(),
     };
 
@@ -131,7 +132,6 @@ describe('UploadQueue (Integration)', () => {
     await ProcessedFileModel.markProcessed({
       driveFileId: 'drive-file-int-2',
       driveFileName: 'already.mp4',
-      instagramAccountId: 'account-1',
     });
 
     const driveFile = {
@@ -139,6 +139,7 @@ describe('UploadQueue (Integration)', () => {
       name: 'already.mp4',
       mimeType: 'video/mp4',
       size: '1000',
+      createdTime: new Date().toISOString(),
       modifiedTime: new Date().toISOString(),
     };
 

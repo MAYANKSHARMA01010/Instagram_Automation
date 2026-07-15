@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { sanitizeError, sanitizeAxiosError, maskSensitiveStrings } from '../../src/utils/error-sanitizer';
 
 describe('Error Sanitizer Security Utility', () => {

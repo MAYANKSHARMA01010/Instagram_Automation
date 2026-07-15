@@ -41,7 +41,7 @@ describe('Proxy Circuit Breaker Stress Test', () => {
     async function mockUpload(accountId: string, proxyUrl: string) {
       activeMutexes++;
       try {
-        const config = buildRequestConfig({ accountId, proxyUrl });
+        buildRequestConfig({ accountId, proxyUrl });
         
         // Simulate network delay
         await new Promise(r => setTimeout(r, 10));

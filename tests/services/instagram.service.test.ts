@@ -66,7 +66,7 @@ let requestInterceptor: any;
   },
   interceptors: {
     request: { use: (fn: any) => { requestInterceptor = fn; } },
-    response: { use: (onSuccess: any, onError: any) => { responseErrorInterceptor = onError; } },
+    response: { use: (_onSuccess: any, onError: any) => { responseErrorInterceptor = onError; } },
   },
 }));
 

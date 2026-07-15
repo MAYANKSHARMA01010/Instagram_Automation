@@ -7,7 +7,6 @@ jest.mock('socks-proxy-agent', () => {
 });
 
 import { buildRequestConfig, clearAgentCache, reportProxyTimeout } from '../../src/utils/proxy-agent';
-import { SocksProxyAgent } from 'socks-proxy-agent';
 
 describe('Proxy Agent Recreation & Stale Eviction', () => {
   beforeEach(() => {
