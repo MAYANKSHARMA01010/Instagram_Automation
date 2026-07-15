@@ -1,6 +1,6 @@
 {
   "name": "instagram-reels-uploader",
-  "version": "1.0.0",
+  "version": "1.3.1",
   "description": "Production-ready Instagram Reel auto-uploader from Google Drive",
   "main": "dist/server.js",
   "scripts": {

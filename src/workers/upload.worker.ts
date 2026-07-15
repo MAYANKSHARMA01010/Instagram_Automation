@@ -72,18 +72,20 @@ export class UploadWorker {
     let localFilePath: string | undefined;
     let uploadedObjectKey: string | undefined;
 
-    let stageTimings: {
-      videoDownload: number;
-      assetFetch: number;
-      containerCreation: number;
-      instagramProcessing: number;
-      publish: number;
-      storageUpload: number;
-      driveMove: number;
-      databaseUpdate: number;
-      notification: number;
-      total: number;
-    } | undefined = undefined;
+    let stageTimings:
+      | {
+          videoDownload: number;
+          assetFetch: number;
+          containerCreation: number;
+          instagramProcessing: number;
+          publish: number;
+          storageUpload: number;
+          driveMove: number;
+          databaseUpdate: number;
+          notification: number;
+          total: number;
+        }
+      | undefined = undefined;
 
     try {
       stageTimings = {
