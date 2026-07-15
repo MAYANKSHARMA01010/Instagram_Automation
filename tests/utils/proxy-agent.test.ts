@@ -4,13 +4,13 @@ jest.mock('https-proxy-agent', () => {
       constructor(url: string) {
         new URL(url); // Will throw if malformed
       }
-    }
+    },
   };
 });
 
 jest.mock('socks-proxy-agent', () => {
   return {
-    SocksProxyAgent: class SocksProxyAgent {}
+    SocksProxyAgent: class SocksProxyAgent {},
   };
 });
 
@@ -44,7 +44,10 @@ describe('Proxy Agent Utility', () => {
   });
 
   it('should create SocksProxyAgent for socks5:// URL', () => {
-    const config = buildRequestConfig({ accountId: 'acc-1', proxyUrl: 'socks5://user:pass@proxy:1080' });
+    const config = buildRequestConfig({
+      accountId: 'acc-1',
+      proxyUrl: 'socks5://user:pass@proxy:1080',
+    });
     expect(config.httpsAgent).toBeDefined();
     expect(config.proxy).toBe(false);
   });
@@ -79,7 +82,7 @@ describe('Proxy Agent Utility', () => {
     const url = 'http://shared-proxy:8080';
     const config1 = buildRequestConfig({ accountId: 'acc-1', proxyUrl: url });
     const config2 = buildRequestConfig({ accountId: 'acc-2', proxyUrl: url });
-    
+
     // The exact same object should be returned from cache
     expect(config1.httpsAgent).toBe(config2.httpsAgent);
   });
@@ -87,7 +90,7 @@ describe('Proxy Agent Utility', () => {
   it('should not share cache across different proxyUrls', () => {
     const config1 = buildRequestConfig({ accountId: 'acc-1', proxyUrl: 'http://proxy-a:80' });
     const config2 = buildRequestConfig({ accountId: 'acc-1', proxyUrl: 'http://proxy-b:80' });
-    
+
     expect(config1.httpsAgent).not.toBe(config2.httpsAgent);
   });
 });

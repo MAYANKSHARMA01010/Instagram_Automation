@@ -65,13 +65,26 @@ let requestInterceptor: any;
     }
   },
   interceptors: {
-    request: { use: (fn: any) => { requestInterceptor = fn; } },
-    response: { use: (_onSuccess: any, onError: any) => { responseErrorInterceptor = onError; } },
+    request: {
+      use: (fn: any) => {
+        requestInterceptor = fn;
+      },
+    },
+    response: {
+      use: (_onSuccess: any, onError: any) => {
+        responseErrorInterceptor = onError;
+      },
+    },
   },
 }));
 
 // Helper to create Axios errors
-function createAxiosError(status: number, message: string, code?: number, type?: string): AxiosError {
+function createAxiosError(
+  status: number,
+  message: string,
+  code?: number,
+  type?: string,
+): AxiosError {
   const err = new Error(message) as any;
   err.isAxiosError = true;
   err.name = 'AxiosError';
@@ -95,9 +108,10 @@ function createNetworkError(message: string): AxiosError {
 describe('InstagramService', () => {
   let service: InstagramService;
 
-  const flushPromises = () => new Promise((resolve) => {
-    jest.requireActual('timers').setImmediate(resolve);
-  });
+  const flushPromises = () =>
+    new Promise((resolve) => {
+      jest.requireActual('timers').setImmediate(resolve);
+    });
 
   const flushTimers = async (count = 1) => {
     for (let i = 0; i < count; i++) {
@@ -121,7 +135,10 @@ describe('InstagramService', () => {
     jest.restoreAllMocks();
   });
 
-  const ctx: AccountNetworkContext = { accountId: 'ig-123', proxyUrl: 'http://user:pass@proxy.com:8080' };
+  const ctx: AccountNetworkContext = {
+    accountId: 'ig-123',
+    proxyUrl: 'http://user:pass@proxy.com:8080',
+  };
 
   describe('Proxy Injection & Defaults', () => {
     it('should inject proxy config when proxyUrl is provided', async () => {
@@ -163,8 +180,8 @@ describe('InstagramService', () => {
         service.createReelContainer(ctxB, 'vidB', 'capB'),
       ]);
 
-      const callA = mockPost.mock.calls.find(c => c[0] === '/acc-A/media');
-      const callB = mockPost.mock.calls.find(c => c[0] === '/acc-B/media');
+      const callA = mockPost.mock.calls.find((c) => c[0] === '/acc-A/media');
+      const callB = mockPost.mock.calls.find((c) => c[0] === '/acc-B/media');
 
       expect(callA[2].httpsAgent).not.toBe(callB[2].httpsAgent);
     });
@@ -174,7 +191,12 @@ describe('InstagramService', () => {
     it('should successfully post and return container ID', async () => {
       mockPost.mockResolvedValueOnce({ data: { id: 'container-123' } });
 
-      const res = await service.createReelContainer(ctx, 'http://vid.mp4', 'my caption', 'http://cover.jpg');
+      const res = await service.createReelContainer(
+        ctx,
+        'http://vid.mp4',
+        'my caption',
+        'http://cover.jpg',
+      );
 
       expect(mockPost).toHaveBeenCalledTimes(1);
       expect(mockPost).toHaveBeenCalledWith(
@@ -202,8 +224,10 @@ describe('InstagramService', () => {
         .mockResolvedValueOnce({ data: { id: 'success-id' } });
 
       let res: any;
-      service.createReelContainer(ctx, 'url', 'cap').then(r => { res = r; });
-      
+      void service.createReelContainer(ctx, 'url', 'cap').then((r) => {
+        res = r;
+      });
+
       await flushTimers(3);
 
       expect(mockPost).toHaveBeenCalledTimes(3);
@@ -214,7 +238,9 @@ describe('InstagramService', () => {
       mockPost.mockRejectedValue(createNetworkError('ECONNRESET'));
 
       let caught: any;
-      service.createReelContainer(ctx, 'url', 'cap').catch(e => { caught = e; });
+      service.createReelContainer(ctx, 'url', 'cap').catch((e) => {
+        caught = e;
+      });
 
       await flushTimers(4);
 
@@ -229,10 +255,12 @@ describe('InstagramService', () => {
         .mockResolvedValueOnce({ data: { id: '123' } });
 
       let res: any;
-      service.createReelContainer(ctx, 'url', 'cap').then(r => { res = r; });
-      
+      void service.createReelContainer(ctx, 'url', 'cap').then((r) => {
+        res = r;
+      });
+
       await flushTimers(2);
-      
+
       expect(mockPost).toHaveBeenCalledTimes(2);
       expect(res.id).toBe('123');
     });
@@ -284,7 +312,9 @@ describe('InstagramService', () => {
         .mockResolvedValueOnce({ data: { status_code: 'FINISHED' } });
 
       let resolved = false;
-      service.waitForContainerReady(ctx, 'cont-123').then(() => { resolved = true; });
+      void service.waitForContainerReady(ctx, 'cont-123').then(() => {
+        resolved = true;
+      });
 
       await flushTimers(1);
       expect(mockGet).toHaveBeenCalledTimes(2);
@@ -296,7 +326,9 @@ describe('InstagramService', () => {
     });
 
     it('should throw immediately if container status is ERROR', async () => {
-      mockGet.mockResolvedValue({ data: { status_code: 'ERROR', error_message: 'Video format invalid' } });
+      mockGet.mockResolvedValue({
+        data: { status_code: 'ERROR', error_message: 'Video format invalid' },
+      });
 
       let caught: Error | undefined;
       try {
@@ -304,7 +336,7 @@ describe('InstagramService', () => {
       } catch (e) {
         caught = e as Error;
       }
-      
+
       expect(caught).toBeDefined();
       expect(caught!.message).toContain('failed with status: ERROR — Video format invalid');
       expect(mockGet).toHaveBeenCalledTimes(1);
@@ -320,7 +352,7 @@ describe('InstagramService', () => {
       } catch (e) {
         caught = e as Error;
       }
-      
+
       expect(caught).toBeDefined();
       expect(caught!.message).toContain('Unexpected empty or invalid payload');
       expect(mockGet).toHaveBeenCalledTimes(1);
@@ -336,7 +368,7 @@ describe('InstagramService', () => {
       } catch (e) {
         caught = e as Error;
       }
-      
+
       expect(caught).toBeDefined();
       expect(caught!.message).toContain('Missing status_code');
       expect(mockGet).toHaveBeenCalledTimes(1);
@@ -346,7 +378,9 @@ describe('InstagramService', () => {
       mockGet.mockResolvedValue({ data: { status_code: 'IN_PROGRESS' } });
 
       let caught: Error | undefined;
-      service.waitForContainerReady(ctx, 'cont-123').catch(e => { caught = e; });
+      service.waitForContainerReady(ctx, 'cont-123').catch((e) => {
+        caught = e;
+      });
 
       // The timeout is set to 15000ms. Interval is 5000ms. Max polls is 3.
       await flushTimers(4);

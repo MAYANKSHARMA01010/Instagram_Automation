@@ -1,10 +1,15 @@
 import { AxiosError } from 'axios';
-import { sanitizeError, sanitizeAxiosError, maskSensitiveStrings } from '../../src/utils/error-sanitizer';
+import {
+  sanitizeError,
+  sanitizeAxiosError,
+  maskSensitiveStrings,
+} from '../../src/utils/error-sanitizer';
 
 describe('Error Sanitizer Security Utility', () => {
   describe('maskSensitiveStrings', () => {
     it('masks proxy URLs with credentials', () => {
-      const msg = 'Failed to connect to proxy: http://admin:superSecretPassword123@proxy.example.com:8080';
+      const msg =
+        'Failed to connect to proxy: http://admin:superSecretPassword123@proxy.example.com:8080';
       const safe = maskSensitiveStrings(msg);
       expect(safe).not.toContain('admin');
       expect(safe).not.toContain('superSecretPassword123');
@@ -54,8 +59,8 @@ describe('Error Sanitizer Security Utility', () => {
         url: 'https://graph.facebook.com/v19.0/me?access_token=SECRET_TOKEN&app_key=SECRET_KEY',
         method: 'post',
         headers: {
-          'Authorization': 'Bearer SECRET_JWT',
-          'Cookie': 'sessionid=abc12345;',
+          Authorization: 'Bearer SECRET_JWT',
+          Cookie: 'sessionid=abc12345;',
           'Content-Type': 'application/json',
           'Proxy-Authorization': 'Basic dXNlcjpwYXNz',
         },
@@ -120,8 +125,9 @@ describe('Error Sanitizer Security Utility', () => {
 
     it('safely handles standard Errors with credentials in stack', () => {
       const err = new Error('Graph token expired access_token=SUPER_SECRET');
-      err.stack = 'Error: Graph token expired access_token=SUPER_SECRET\n  at SomeFunction (index.js:10:1)';
-      
+      err.stack =
+        'Error: Graph token expired access_token=SUPER_SECRET\n  at SomeFunction (index.js:10:1)';
+
       const safe = sanitizeError(err);
       expect(safe.message).not.toContain('SUPER_SECRET');
       expect(safe.message).toContain('access_token=[REDACTED]');
@@ -131,7 +137,11 @@ describe('Error Sanitizer Security Utility', () => {
     it('routes AxiosErrors through sanitizeAxiosError when passed to sanitizeError', () => {
       const rawError = new Error('Axios failed') as AxiosError;
       rawError.isAxiosError = true;
-      rawError.response = { status: 500, config: { url: 'http://user:pass@host' }, headers: null } as any;
+      rawError.response = {
+        status: 500,
+        config: { url: 'http://user:pass@host' },
+        headers: null,
+      } as any;
       const safe = sanitizeError(rawError) as any;
       expect(safe.response.status).toBe(500);
       expect(safe.response.config.url).toContain('[REDACTED]');

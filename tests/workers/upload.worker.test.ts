@@ -179,11 +179,11 @@ describe('UploadWorker', () => {
         expect(ig.createReelContainer).toHaveBeenCalledTimes(1);
         expect(ig.waitForContainerReady).toHaveBeenCalledWith(
           expect.objectContaining({ accountId: 'ig-account-123' }),
-          'container-abc'
+          'container-abc',
         );
         expect(ig.publishReel).toHaveBeenCalledWith(
           expect.objectContaining({ accountId: 'ig-account-123' }),
-          'container-abc'
+          'container-abc',
         );
         expect(getDriveService().moveToUploaded).toHaveBeenCalledTimes(1);
 
@@ -194,17 +194,19 @@ describe('UploadWorker', () => {
         expect(getHelpers().safeDeleteFile).toHaveBeenCalledWith('/tmp/test-video.mp4');
 
         const stats = require('../../src/services/statistics.service').getStatisticsService();
-        expect(stats.recordStorageMetrics).toHaveBeenCalledWith(expect.objectContaining({
-          uploadDurationMs: expect.any(Number),
-          bytesUploaded: 50000000,
-        }));
+        expect(stats.recordStorageMetrics).toHaveBeenCalledWith(
+          expect.objectContaining({
+            uploadDurationMs: expect.any(Number),
+            bytesUploaded: 50000000,
+          }),
+        );
       });
 
       it('should always clean up the temp file and storage object (finally block)', async () => {
         setupSuccessfulPipeline();
         await worker.processJob(makeMockJob());
         expect(getHelpers().safeDeleteFile).toHaveBeenCalledWith('/tmp/test-video.mp4');
-        
+
         const storage = getStorageServiceMock();
         expect(storage.deleteFile).toHaveBeenCalledWith('mock-object-key');
       });
@@ -296,9 +298,11 @@ describe('UploadWorker', () => {
         expect(getHelpers().safeDeleteFile).toHaveBeenCalledWith('/tmp/test-video.mp4');
 
         const stats = require('../../src/services/statistics.service').getStatisticsService();
-        expect(stats.recordStorageMetrics).toHaveBeenCalledWith(expect.objectContaining({
-          uploadFailed: true
-        }));
+        expect(stats.recordStorageMetrics).toHaveBeenCalledWith(
+          expect.objectContaining({
+            uploadFailed: true,
+          }),
+        );
       });
 
       it('should handle cleanup failure gracefully (log only) and not throw', async () => {
@@ -311,13 +315,18 @@ describe('UploadWorker', () => {
         const result = await worker.processJob(makeMockJob());
         expect(result.success).toBe(true); // Should not fail the job
         expect(storage.deleteFile).toHaveBeenCalledWith('mock-object-key');
-        expect(loggerMock).toHaveBeenCalledWith('Failed to clean up storage object', expect.any(Object));
+        expect(loggerMock).toHaveBeenCalledWith(
+          'Failed to clean up storage object',
+          expect.any(Object),
+        );
         expect(getHelpers().safeDeleteFile).toHaveBeenCalledWith('/tmp/test-video.mp4');
 
         const stats = require('../../src/services/statistics.service').getStatisticsService();
-        expect(stats.recordStorageMetrics).toHaveBeenCalledWith(expect.objectContaining({
-          deleteFailed: true
-        }));
+        expect(stats.recordStorageMetrics).toHaveBeenCalledWith(
+          expect.objectContaining({
+            deleteFailed: true,
+          }),
+        );
       });
 
       it('DRY_RUN: Storage integration happens even in dry run (publish mocked)', async () => {
@@ -325,15 +334,15 @@ describe('UploadWorker', () => {
         const configMock = require('../../src/config');
         configMock.getConfig.mockReturnValue({
           ...require('../fixtures').mockConfig,
-          app: { ...require('../fixtures').mockConfig.app, dryRun: true }
+          app: { ...require('../fixtures').mockConfig.app, dryRun: true },
         });
-        
+
         worker = new UploadWorker(); // re-instantiate to pick up new config
-        
+
         // Even if the publisher intercepts later, the storage upload and generation must happen
         const result = await worker.processJob(makeMockJob());
         expect(result.success).toBe(true);
-        
+
         const storage = getStorageServiceMock();
         expect(storage.uploadFile).toHaveBeenCalled();
         expect(storage.generateSignedUrl).toHaveBeenCalled();

@@ -147,7 +147,7 @@ describe('StatisticsService', () => {
       expect(summary.uploadsToday).toBe(0); // Reset!
 
       jest.spyOn(Date.prototype, 'getDate').mockRestore();
-            Date.prototype.getDate = originalGetDate;
+      Date.prototype.getDate = originalGetDate;
     });
   });
 });

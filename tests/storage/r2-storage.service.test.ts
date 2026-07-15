@@ -1,6 +1,11 @@
 import { R2StorageService } from '../../src/services/storage/r2-storage.service';
 import { getConfig } from '../../src/config';
-import { HeadObjectCommand, DeleteObjectCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  HeadObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import fs from 'fs';
@@ -50,7 +55,7 @@ describe('R2StorageService', () => {
     });
 
     service = new R2StorageService();
-    // @ts-ignore
+    // @ts-expect-error - mock private property
     mockS3ClientSend = service.client.send as jest.Mock;
   });
 
@@ -58,7 +63,7 @@ describe('R2StorageService', () => {
     it('should upload a file and return the object key', async () => {
       (fs.promises.stat as jest.Mock).mockResolvedValue({ size: 1024 });
       (fs.createReadStream as jest.Mock).mockReturnValue('mock-stream');
-      
+
       const mockUploadDone = jest.fn().mockResolvedValue(true);
       (Upload as unknown as jest.Mock).mockImplementation(() => ({
         done: mockUploadDone,
@@ -68,14 +73,16 @@ describe('R2StorageService', () => {
 
       expect(fs.promises.stat).toHaveBeenCalledWith('/tmp/file.mp4');
       expect(fs.createReadStream).toHaveBeenCalledWith('/tmp/file.mp4');
-      expect(Upload).toHaveBeenCalledWith(expect.objectContaining({
-        params: expect.objectContaining({
-          Bucket: 'test-bucket',
-          ContentType: 'video/mp4',
-          ContentLength: 1024,
-          CacheControl: 'max-age=31536000',
+      expect(Upload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            Bucket: 'test-bucket',
+            ContentType: 'video/mp4',
+            ContentLength: 1024,
+            CacheControl: 'max-age=31536000',
+          }),
         }),
-      }));
+      );
       expect(mockUploadDone).toHaveBeenCalled();
       expect(key).toMatch(/^test\/\d{4}\/\d{2}\/test-account\/test-uuid\.mp4$/);
     });
@@ -83,14 +90,16 @@ describe('R2StorageService', () => {
     it('should throw an InfrastructureError on upload failure', async () => {
       (fs.promises.stat as jest.Mock).mockResolvedValue({ size: 1024 });
       (fs.createReadStream as jest.Mock).mockReturnValue('mock-stream');
-      
+
       const mockUploadDone = jest.fn().mockRejectedValue(new Error('Network error'));
       (Upload as unknown as jest.Mock).mockImplementation(() => ({
         done: mockUploadDone,
       }));
 
-      await expect(service.uploadFile('/tmp/file.mp4', 'video/mp4')).rejects.toThrow('Network error');
-      
+      await expect(service.uploadFile('/tmp/file.mp4', 'video/mp4')).rejects.toThrow(
+        'Network error',
+      );
+
       try {
         await service.uploadFile('/tmp/file.mp4', 'video/mp4');
       } catch (e: any) {
@@ -109,7 +118,9 @@ describe('R2StorageService', () => {
         Bucket: 'test-bucket',
         Key: 'test-key',
       });
-      expect(getSignedUrl).toHaveBeenCalledWith(expect.anything(), expect.any(Object), { expiresIn: 3600 });
+      expect(getSignedUrl).toHaveBeenCalledWith(expect.anything(), expect.any(Object), {
+        expiresIn: 3600,
+      });
       expect(url).toBe('https://signed.url');
     });
 
@@ -117,7 +128,7 @@ describe('R2StorageService', () => {
       (getSignedUrl as jest.Mock).mockRejectedValue(new Error('Sign error'));
 
       await expect(service.generateSignedUrl('test-key')).rejects.toThrow('Sign error');
-      
+
       try {
         await service.generateSignedUrl('test-key');
       } catch (e: any) {

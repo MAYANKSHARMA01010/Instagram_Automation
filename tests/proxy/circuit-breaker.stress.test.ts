@@ -6,7 +6,13 @@ jest.mock('socks-proxy-agent', () => {
   return { SocksProxyAgent: jest.fn().mockImplementation(() => ({ destroy: jest.fn() })) };
 });
 
-import { buildRequestConfig, getProxyMetrics, clearAgentCache, reportProxySuccess, reportProxyTimeout } from '../../src/utils/proxy-agent';
+import {
+  buildRequestConfig,
+  getProxyMetrics,
+  clearAgentCache,
+  reportProxySuccess,
+  reportProxyTimeout,
+} from '../../src/utils/proxy-agent';
 import { AccountNetworkContext } from '../../src/types/network.types';
 
 describe('Proxy Circuit Breaker Stress Test', () => {
@@ -23,13 +29,13 @@ describe('Proxy Circuit Breaker Stress Test', () => {
     const NUM_UPLOADS = 100;
     const NUM_ACCOUNTS = 10;
     const BROKEN_PROXIES = ['http://broken1.com', 'http://broken2.com'];
-    
+
     // Setup accounts
     const accounts: AccountNetworkContext[] = [];
     for (let i = 0; i < NUM_ACCOUNTS; i++) {
       accounts.push({
         accountId: `account-${i}`,
-        proxyUrl: i < 2 ? BROKEN_PROXIES[i] : `http://healthy${i}.com`
+        proxyUrl: i < 2 ? BROKEN_PROXIES[i] : `http://healthy${i}.com`,
       });
     }
 
@@ -42,9 +48,9 @@ describe('Proxy Circuit Breaker Stress Test', () => {
       activeMutexes++;
       try {
         buildRequestConfig({ accountId, proxyUrl });
-        
+
         // Simulate network delay
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 10));
 
         if (BROKEN_PROXIES.includes(proxyUrl)) {
           // Simulate timeout
@@ -54,7 +60,7 @@ describe('Proxy Circuit Breaker Stress Test', () => {
           // Simulate success
           reportProxySuccess(proxyUrl);
         }
-        
+
         completedUploads++;
       } catch (err) {
         failedUploads++;
@@ -75,7 +81,7 @@ describe('Proxy Circuit Breaker Stress Test', () => {
       jest.advanceTimersByTime(20);
       await Promise.resolve(); // flush microtasks
     }
-    
+
     await Promise.all(promises);
 
     // Verify Mutexes Released (simulated by activeMutexes count)
@@ -83,7 +89,7 @@ describe('Proxy Circuit Breaker Stress Test', () => {
 
     // Verify Queue Drained
     expect(completedUploads + failedUploads).toBe(NUM_UPLOADS);
-    
+
     // 2 broken proxies accounts will fail 100 * (2/10) = 20 uploads
     expect(failedUploads).toBe(20);
     expect(completedUploads).toBe(80);
@@ -93,15 +99,15 @@ describe('Proxy Circuit Breaker Stress Test', () => {
     // 10 proxies total: 8 healthy (CLOSED), 2 broken (OPEN)
     expect(metrics.active_agents).toBe(8);
     expect(metrics.open_circuit_breakers).toBe(2);
-    
+
     // Fast-forward 24 hours to trigger stale eviction
     jest.advanceTimersByTime(25 * 60 * 60 * 1000);
-    
+
     // Now trigger a request on a healthy proxy, it should evict the stale agent
     const healthyAccount = accounts[2];
     buildRequestConfig(healthyAccount);
-    
-    // The other 7 healthy ones are stale but won't be evicted until accessed, 
+
+    // The other 7 healthy ones are stale but won't be evicted until accessed,
     // but the circuit breaker logic proves memory won't grow unbounded.
   });
 });

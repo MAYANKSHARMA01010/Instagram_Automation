@@ -72,7 +72,11 @@ jest.mock('../../src/config/database', () => {
       },
       accountHealth: {
         upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve(create)),
-        findUnique: jest.fn().mockImplementation(({ where }) => Promise.resolve({ instagramAccountId: where.instagramAccountId, healthScore: 100 })),
+        findUnique: jest
+          .fn()
+          .mockImplementation(({ where }) =>
+            Promise.resolve({ instagramAccountId: where.instagramAccountId, healthScore: 100 }),
+          ),
         update: jest.fn().mockImplementation(({ data }) => Promise.resolve(data)),
       },
       $disconnect: jest.fn().mockResolvedValue(undefined),

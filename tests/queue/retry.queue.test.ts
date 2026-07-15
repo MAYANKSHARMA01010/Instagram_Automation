@@ -18,8 +18,8 @@ jest.mock('../../src/database/repository', () => ({
 
 jest.mock('../../src/services/health.service', () => ({
   getHealthService: jest.fn(() => ({
-    checkCooldown: jest.fn().mockResolvedValue(false)
-  }))
+    checkCooldown: jest.fn().mockResolvedValue(false),
+  })),
 }));
 
 jest.mock('../../src/config', () => ({

@@ -29,7 +29,7 @@ describe('Storage Service Factory & Configuration', () => {
 
       // Require dynamically to avoid caching issues with singletons in tests
       const { getStorageService } = require('../../src/services/storage');
-      
+
       const service = getStorageService();
 
       expect(service).toBeInstanceOf(LocalStorageService);
@@ -97,10 +97,10 @@ describe('Storage Service Factory & Configuration', () => {
   describe('Startup Validation State', () => {
     it('should update storage health state correctly', () => {
       const { setStorageHealthy, getStorageHealth } = require('../../src/services/storage');
-      
+
       setStorageHealthy(false);
       expect(getStorageHealth()).toBe(false);
-      
+
       setStorageHealthy(true);
       expect(getStorageHealth()).toBe(true);
     });

@@ -184,14 +184,16 @@ describe('HealthService', () => {
       // Score is omitted from update (no penalty), cooldown is applied
       expect(mockAccountHealthModel.update).toHaveBeenCalledWith(
         ACCOUNT_ID,
-        expect.objectContaining({ 
+        expect.objectContaining({
           cooldownUntil: expect.any(Date),
-          failedUploads: expect.any(Number) 
+          failedUploads: expect.any(Number),
         }),
       );
-      
+
       // Ensure healthScore was NOT updated
-      const updateCallArgs = (mockAccountHealthModel.update as jest.Mock).mock.calls.find(c => c[0] === ACCOUNT_ID);
+      const updateCallArgs = (mockAccountHealthModel.update as jest.Mock).mock.calls.find(
+        (c) => c[0] === ACCOUNT_ID,
+      );
       expect(updateCallArgs[1].healthScore).toBeUndefined();
     });
 
