@@ -17,6 +17,8 @@ model UploadLog {
   instagramMediaId      String?  @map("instagram_media_id")
   errorMessage          String?  @map("error_message")
   durationMs            Int      @default(0) @map("duration_ms")
+  storageTimeMs         Int?     @map("storage_time_ms")
+  proxyUrl              String?  @map("proxy_url")
   queueStartTime        DateTime @default(now()) @map("queue_start_time")
   uploadStartTime       DateTime @default(now()) @map("upload_start_time")
   uploadEndTime         DateTime @default(now()) @map("upload_end_time")

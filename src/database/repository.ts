@@ -34,6 +34,8 @@ export const UploadLogModel = {
         uploadStartTime: new Date(data.uploadStartTime),
         uploadEndTime: new Date(data.uploadEndTime),
         retryCount: data.retryCount,
+        storageTimeMs: data.storageTimeMs ?? null,
+        proxyUrl: data.proxyUrl ?? null,
       },
     });
 
@@ -465,6 +467,8 @@ function mapUploadLog(row: any): UploadLog {
     uploadEndTime: row.uploadEndTime.toISOString(),
     retryCount: row.retryCount,
     createdAt: row.createdAt,
+    proxyUrl: row.proxyUrl ?? undefined,
+    storageTimeMs: row.storageTimeMs ?? undefined,
   };
 }
 

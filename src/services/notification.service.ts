@@ -15,6 +15,7 @@ export interface StartedPayload {
   totalInQueue: number; // total pending when job started
   startTime: Date;
   accountId?: string;
+  proxyUrl?: string;
 }
 
 export interface SuccessPayload {
@@ -24,6 +25,8 @@ export interface SuccessPayload {
   driveFileId: string;
   queueRemaining: number; // jobs still pending after this one
   accountId?: string;
+  proxyUrl?: string;
+  storageUploadMs?: number;
 }
 
 export interface FailurePayload {
@@ -34,6 +37,8 @@ export interface FailurePayload {
   httpStatus?: number; // HTTP status code if available
   retryCount: number; // how many attempts were made
   accountId?: string;
+  proxyUrl?: string;
+  storageUploadMs?: number;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -79,6 +84,9 @@ export class NotificationService {
       `👤 *Account:* ${account?.accountName ? this.esc(account.accountName) : 'Unknown'}`,
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `🔢 *Queue Position:* ${payload.queuePosition} of ${payload.totalInQueue}`,
+      ...(payload.proxyUrl
+        ? [`🌐 *Proxy:* \`${this.esc(payload.proxyUrl.replace(/:\/\/[^@]+@/, '://***:***@'))}\``]
+        : []),
       `🕐 *Start Time:* ${startStr}`,
     ].join('\n');
 
@@ -110,8 +118,14 @@ export class NotificationService {
       `👤 *Account:* ${account?.accountName ? this.esc(account.accountName) : 'Unknown'}`,
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `⏱ *Upload Time:* ${uploadSeconds}s`,
+      ...(payload.storageUploadMs
+        ? [`☁️ *Storage Upload Time:* ${Math.round(payload.storageUploadMs / 1000)}s`]
+        : []),
       `🆔 *Instagram Media ID:* \`${payload.instagramMediaId}\``,
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
+      ...(payload.proxyUrl
+        ? [`🌐 *Proxy:* \`${this.esc(payload.proxyUrl.replace(/:\/\/[^@]+@/, '://***:***@'))}\``]
+        : []),
       `🔜 *Queue Remaining:* ${payload.queueRemaining} video(s)`,
       `📊 *Total Uploaded Today:* ${totalToday}`,
       `🌐 *Meta API Calls Today:* ${stats.metaApiCallsToday}`,
@@ -148,6 +162,12 @@ export class NotificationService {
       `👤 *Account:* ${account?.accountName ? this.esc(account.accountName) : 'Unknown'}`,
       `📹 *File:* \`${this.esc(payload.fileName)}\``,
       `📂 *Drive ID:* \`${payload.driveFileId}\``,
+      ...(payload.proxyUrl
+        ? [`🌐 *Proxy:* \`${this.esc(payload.proxyUrl.replace(/:\/\/[^@]+@/, '://***:***@'))}\``]
+        : []),
+      ...(payload.storageUploadMs
+        ? [`☁️ *Storage Upload Time:* ${Math.round(payload.storageUploadMs / 1000)}s`]
+        : []),
       `💬 *Error:* ${this.esc(payload.reason)}${httpLine}`,
       `🚫 *Error Category:* ${errorCategory}`,
       `🔁 *Retry Count:* ${payload.retryCount}`,

@@ -57,18 +57,36 @@ export class UploadWorker {
     const queueStartTime = job.createdAt.toISOString();
     const uploadStartTime = new Date();
 
+    const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
+    const account = this.config.accounts.find((a) => a.instagramAccountId === accountId);
+    const proxyUrl = account?.proxyUrl;
+
     logger.info('Starting upload pipeline', {
       jobId: job.id,
       fileName: job.driveFileName,
       driveFileId: job.driveFileId,
       attempt: job.retryCount + 1,
+      proxyUrl,
     });
 
     let localFilePath: string | undefined;
     let uploadedObjectKey: string | undefined;
 
+    let stageTimings: {
+      videoDownload: number;
+      assetFetch: number;
+      containerCreation: number;
+      instagramProcessing: number;
+      publish: number;
+      storageUpload: number;
+      driveMove: number;
+      databaseUpdate: number;
+      notification: number;
+      total: number;
+    } | undefined = undefined;
+
     try {
-      const stageTimings = {
+      stageTimings = {
         videoDownload: 0,
         assetFetch: 0,
         containerCreation: 0,
@@ -123,8 +141,6 @@ export class UploadWorker {
       t0 = Date.now();
       await UploadJobModel.update(job.id, { status: 'UPLOADING' });
 
-      const accountId = job.instagramAccountId ?? this.config.instagram.accountId;
-      const account = this.config.accounts.find((a) => a.instagramAccountId === accountId);
       const sourceFolderId = account?.driveFolderId ?? this.config.google.driveFolderId;
 
       const instagramService = getInstagramService();
@@ -204,7 +220,7 @@ export class UploadWorker {
 
       const context = {
         accountId,
-        proxyUrl: account?.proxyUrl,
+        proxyUrl,
       };
 
       // ── Step 3.5: Upload to Storage and get URL ──────────────────────────────
@@ -386,6 +402,8 @@ export class UploadWorker {
         driveFileId: job.driveFileId,
         queueRemaining,
         accountId,
+        proxyUrl,
+        storageUploadMs: stageTimings.storageUpload,
       });
       stageTimings.notification = Date.now() - t0;
 
@@ -423,6 +441,8 @@ export class UploadWorker {
         httpStatus,
         uploadStartTime,
         queueStartTime,
+        proxyUrl,
+        stageTimings?.storageUpload,
       );
       return { success: false, restrictAccount: isRestricted };
     } finally {
@@ -461,6 +481,8 @@ export class UploadWorker {
     httpStatus: number | undefined,
     uploadStartTime: Date,
     queueStartTime: string,
+    proxyUrl?: string,
+    storageTimeMs?: number,
   ): Promise<void> {
     const uploadEndTime = new Date();
     const durationMs = elapsedMs(uploadStartTime);
@@ -493,6 +515,8 @@ export class UploadWorker {
       uploadStartTime: uploadStartTime.toISOString(),
       uploadEndTime: uploadEndTime.toISOString(),
       retryCount: job.retryCount,
+      proxyUrl,
+      storageTimeMs,
     });
 
     logger.error('Upload job failed', {
@@ -514,6 +538,8 @@ export class UploadWorker {
       httpStatus,
       retryCount: job.retryCount,
       accountId: job.instagramAccountId ?? undefined,
+      proxyUrl,
+      storageUploadMs: storageTimeMs,
     });
   }
 

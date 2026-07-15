@@ -137,6 +137,10 @@ export class DownloadWorker {
           remainingAfter: pendingBefore,
         });
 
+        const config = getConfig();
+        const accountId = currentJob.instagramAccountId ?? config.instagram.accountId;
+        const account = config.accounts.find((a) => a.instagramAccountId === accountId);
+
         // ── REQ-6a: Notify Upload Started ──────────────────────────────────
         const notificationService = getNotificationService();
         await notificationService.notifyUploadStarted({
@@ -145,6 +149,7 @@ export class DownloadWorker {
           totalInQueue: batchTotalFound + pendingBefore,
           startTime: new Date(),
           accountId: currentJob.instagramAccountId ?? undefined,
+          proxyUrl: account?.proxyUrl,
         });
 
         let processResult: { success: boolean; restrictAccount?: boolean } = { success: false };

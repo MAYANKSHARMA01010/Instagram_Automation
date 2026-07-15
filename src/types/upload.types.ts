@@ -45,6 +45,8 @@ export interface UploadLog {
   createdAt: Date;
   instagramAccountId?: string;
   uploadedDriveFolderId?: string;
+  proxyUrl?: string;
+  storageTimeMs?: number;
 }
 
 export interface ProcessedFile {
