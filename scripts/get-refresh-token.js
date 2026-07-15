@@ -27,7 +27,7 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
   process.exit(1);
 }
 
-const PORT = 3000;
+const PORT = 3001;
 const REDIRECT_URI = `http://localhost:${PORT}`;
 
 const oauth2Client = new google.auth.OAuth2(

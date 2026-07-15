@@ -11,7 +11,7 @@ export function getDatabase(): PrismaClient {
   if (prisma) return prisma;
 
   prisma = new PrismaClient({
-    log: ['query', 'info', 'warn', 'error'],
+    log: ['error', 'warn'],
   });
 
   logger.info('Prisma Postgres database initialized');
