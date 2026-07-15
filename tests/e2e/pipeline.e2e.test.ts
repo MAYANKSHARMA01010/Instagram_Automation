@@ -75,8 +75,19 @@ jest.mock('../../src/services/statistics.service', () => ({
   getStatisticsService: jest.fn(() => ({
     recordSuccess: jest.fn(),
     recordFailure: jest.fn(),
+    recordStorageMetrics: jest.fn(),
     getDailySummary: jest.fn().mockReturnValue({ total: 1, success: 0, failed: 1, remaining: 0 }),
     categoriseError: jest.fn().mockReturnValue('Upload Failed'),
+  })),
+}));
+
+jest.mock('../../src/services/storage', () => ({
+  getStorageService: jest.fn(() => ({
+    uploadFile: jest.fn().mockResolvedValue('mock-object-key'),
+    generateSignedUrl: jest.fn().mockResolvedValue('https://mock.storage.url/video.mp4'),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+    healthCheck: jest.fn().mockResolvedValue(true),
+    exists: jest.fn().mockResolvedValue(true),
   })),
 }));
 
@@ -241,6 +252,7 @@ describe('E2E Pipeline Simulation', () => {
       name: 'video.mp4',
       mimeType: 'video/mp4',
       size: '1000',
+      createdTime: '2023-01-01T00:00:00.000Z',
       modifiedTime: '',
     };
 
@@ -408,6 +420,7 @@ describe('E2E Pipeline Simulation', () => {
       name: 'video.mp4',
       mimeType: 'video/mp4',
       size: '1000',
+      createdTime: '2023-01-01T00:00:00.000Z',
       modifiedTime: '',
     };
 

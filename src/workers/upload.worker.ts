@@ -12,6 +12,7 @@ import { safeDeleteFile, elapsedMs } from '../utils/helpers';
 import { getConfig } from '../config';
 import logger from '../utils/logger';
 import { getHealthService } from '../services/health.service';
+import { getStorageService } from '../services/storage';
 
 /**
  * Core upload worker that orchestrates the full upload pipeline:
@@ -64,6 +65,7 @@ export class UploadWorker {
     });
 
     let localFilePath: string | undefined;
+    let uploadedObjectKey: string | undefined;
 
     try {
       const stageTimings = {
@@ -72,6 +74,7 @@ export class UploadWorker {
         containerCreation: 0,
         instagramProcessing: 0,
         publish: 0,
+        storageUpload: 0,
         driveMove: 0,
         databaseUpdate: 0,
         notification: 0,
@@ -204,15 +207,52 @@ export class UploadWorker {
         proxyUrl: account?.proxyUrl,
       };
 
-      // Instagram Graph API requires a publicly accessible URL for Reels.
-      // We serve the downloaded tmp file via the /public/tmp route.
-      const host = process.env.PUBLIC_URL ?? `http://localhost:${this.config.app.port}`;
-      const videoFileName = localFilePath.split('/').pop() ?? 'video.mp4';
-      const videoUrl = `${host}/public/tmp/${videoFileName}`;
+      // ── Step 3.5: Upload to Storage and get URL ──────────────────────────────
+      t0 = Date.now();
+      const storageService = getStorageService();
 
-      stageTimings.assetFetch = Date.now() - t0;
+      logger.info('Starting storage upload', {
+        jobId: job.id,
+        sizeBytes: downloadResult.fileSize,
+      });
 
-      logger.info('Exposing video via public URL for Instagram API', { videoUrl });
+      // Upload to configured storage (local or r2)
+      try {
+        uploadedObjectKey = await storageService.uploadFile(localFilePath, downloadResult.mimeType);
+      } catch (err) {
+        getStatisticsService().recordStorageMetrics({ uploadFailed: true });
+        throw err;
+      }
+
+      const storageUploadMs = Date.now() - t0;
+      stageTimings.storageUpload = storageUploadMs;
+
+      logger.info('Storage upload completed', {
+        jobId: job.id,
+        uploadedObjectKey,
+        durationMs: storageUploadMs,
+      });
+
+      getStatisticsService().recordStorageMetrics({
+        uploadDurationMs: storageUploadMs,
+        bytesUploaded: downloadResult.fileSize,
+      });
+
+      // Generate the URL Instagram will consume
+      let videoUrl: string;
+      try {
+        videoUrl = await storageService.generateSignedUrl(uploadedObjectKey);
+      } catch (err) {
+        getStatisticsService().recordStorageMetrics({ signedUrlFailed: true });
+        throw err;
+      }
+
+      stageTimings.assetFetch = Date.now() - t0 - storageUploadMs;
+
+      logger.info('Exposing video via storage provider URL for Instagram API', {
+        uploadedObjectKey,
+        // Intentionally not logging videoUrl to prevent secret leakage in logs
+      });
 
       // ── Step 4: Create Instagram Reel container ─────────────────────────────
       t0 = Date.now();
@@ -386,7 +426,21 @@ export class UploadWorker {
       );
       return { success: false, restrictAccount: isRestricted };
     } finally {
-      // ── Cleanup: Remove temp file regardless of outcome ────────────────────
+      // ── Cleanup: Remove storage object and temp file regardless of outcome ──
+      if (uploadedObjectKey) {
+        try {
+          const storageService = getStorageService();
+          await storageService.deleteFile(uploadedObjectKey);
+          logger.info('Storage object cleaned up', { objectKey: uploadedObjectKey });
+        } catch (cleanupErr) {
+          getStatisticsService().recordStorageMetrics({ deleteFailed: true });
+          logger.warn('Failed to clean up storage object', {
+            objectKey: uploadedObjectKey,
+            error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+          });
+        }
+      }
+
       if (localFilePath) {
         safeDeleteFile(localFilePath);
         logger.debug('Temp file cleaned up', { localFilePath });

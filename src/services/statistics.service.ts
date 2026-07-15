@@ -8,6 +8,7 @@ interface StageAverages {
   containerCreation: number;
   instagramProcessing: number;
   publish: number;
+  storageUpload: number; // R2 upload duration
   total: number;
 }
 
@@ -27,6 +28,13 @@ export interface DailySummary {
   successRate: string;
   metaApiCallsToday: number; // each upload = 2 calls (container + publish)
   avgUploadTimeSeconds: number;
+  storageMetrics: {
+    uploadDurationTotalMs: number;
+    bytesUploadedTotal: number;
+    uploadFailures: number;
+    deleteFailures: number;
+    signedUrlFailures: number;
+  };
   errorBreakdown: Record<string, number>;
   accountSummaries: AccountStats[];
 }
@@ -37,6 +45,14 @@ export class StatisticsService {
   private failuresToday = 0;
   private retriesToday = 0;
   private metaApiCallsToday = 0; // 2 per success (container + publish), 1 per failure
+
+  // Storage Metrics
+  private storageUploadDurationTotalMs = 0;
+  private storageBytesUploadedTotal = 0;
+  private storageUploadFailures = 0;
+  private storageDeleteFailures = 0;
+  private storageSignedUrlFailures = 0;
+
   private errorBreakdown: Record<string, number> = {};
 
   // Per-account tracking: keyed by instagramAccountId
@@ -48,6 +64,7 @@ export class StatisticsService {
     containerCreation: 0,
     instagramProcessing: 0,
     publish: 0,
+    storageUpload: 0,
     total: 0,
   };
 
@@ -63,6 +80,11 @@ export class StatisticsService {
       this.failuresToday = 0;
       this.retriesToday = 0;
       this.metaApiCallsToday = 0;
+      this.storageUploadDurationTotalMs = 0;
+      this.storageBytesUploadedTotal = 0;
+      this.storageUploadFailures = 0;
+      this.storageDeleteFailures = 0;
+      this.storageSignedUrlFailures = 0;
       this.errorBreakdown = {};
       this.accountStats = new Map();
       this.timingSums = {
@@ -71,6 +93,7 @@ export class StatisticsService {
         containerCreation: 0,
         instagramProcessing: 0,
         publish: 0,
+        storageUpload: 0,
         total: 0,
       };
     }
@@ -132,6 +155,13 @@ export class StatisticsService {
       successRate,
       metaApiCallsToday: this.metaApiCallsToday,
       avgUploadTimeSeconds,
+      storageMetrics: {
+        uploadDurationTotalMs: this.storageUploadDurationTotalMs,
+        bytesUploadedTotal: this.storageBytesUploadedTotal,
+        uploadFailures: this.storageUploadFailures,
+        deleteFailures: this.storageDeleteFailures,
+        signedUrlFailures: this.storageSignedUrlFailures,
+      },
       errorBreakdown: { ...this.errorBreakdown },
       accountSummaries: Array.from(this.accountStats.values()),
     };
@@ -148,6 +178,7 @@ export class StatisticsService {
     this.timingSums.containerCreation += timings.containerCreation || 0;
     this.timingSums.instagramProcessing += timings.instagramProcessing || 0;
     this.timingSums.publish += timings.publish || 0;
+    this.timingSums.storageUpload += timings.storageUpload || 0;
     this.timingSums.total += timings.total || 0;
 
     // Per-account tracking
@@ -182,6 +213,21 @@ export class StatisticsService {
     this.logSummary();
   }
 
+  recordStorageMetrics(metrics: {
+    uploadDurationMs?: number;
+    bytesUploaded?: number;
+    uploadFailed?: boolean;
+    deleteFailed?: boolean;
+    signedUrlFailed?: boolean;
+  }): void {
+    this.checkReset();
+    if (metrics.uploadDurationMs) this.storageUploadDurationTotalMs += metrics.uploadDurationMs;
+    if (metrics.bytesUploaded) this.storageBytesUploadedTotal += metrics.bytesUploaded;
+    if (metrics.uploadFailed) this.storageUploadFailures++;
+    if (metrics.deleteFailed) this.storageDeleteFailures++;
+    if (metrics.signedUrlFailed) this.storageSignedUrlFailures++;
+  }
+
   private logSummary(): void {
     const totalAttempts = this.uploadsToday + this.failuresToday;
     const successRate = totalAttempts === 0 ? 0 : (this.uploadsToday / totalAttempts) * 100;
@@ -198,10 +244,18 @@ export class StatisticsService {
       averagesMs: {
         videoDownload: Math.round(avg(this.timingSums.videoDownload)),
         assetFetch: Math.round(avg(this.timingSums.assetFetch)),
+        storageUpload: Math.round(avg(this.timingSums.storageUpload)),
         containerCreation: Math.round(avg(this.timingSums.containerCreation)),
         instagramProcessing: Math.round(avg(this.timingSums.instagramProcessing)),
         publish: Math.round(avg(this.timingSums.publish)),
         total: Math.round(avg(this.timingSums.total)),
+      },
+      storageMetrics: {
+        uploadDurationTotalMs: this.storageUploadDurationTotalMs,
+        bytesUploadedTotal: this.storageBytesUploadedTotal,
+        uploadFailures: this.storageUploadFailures,
+        deleteFailures: this.storageDeleteFailures,
+        signedUrlFailures: this.storageSignedUrlFailures,
       },
     });
   }
