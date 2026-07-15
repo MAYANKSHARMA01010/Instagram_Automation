@@ -8,11 +8,15 @@ import { Config } from '../../src/types/config.types';
 // ─── Mock Config ──────────────────────────────────────────────────────────────
 
 export const mockConfig: Config = {
+  storage: {
+    provider: 'local',
+  },
   app: {
     port: 3000,
     nodeEnv: 'test',
     apiKey: 'test-api-key',
     publicUrl: 'http://localhost:3000',
+    dryRun: false,
   },
   google: {
     clientId: 'test-client-id',
@@ -51,7 +55,6 @@ export const mockConfig: Config = {
     postingWindowEnd: '23:59',
   },
   database: {
-    sqlitePath: './test.db',
     databaseUrl: 'postgresql://test',
   },
   telegram: {

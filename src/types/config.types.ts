@@ -58,6 +58,16 @@ export interface DatabaseConfig {
   databaseUrl?: string;
 }
 
+export interface StorageConfig {
+  provider: 'local' | 'r2';
+  r2?: {
+    accountId: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    bucketName: string;
+  };
+}
+
 export interface TelegramConfig {
   botToken: string;
   chatId: string;
@@ -94,6 +104,7 @@ export interface Config {
   content: ContentConfig;
   upload: UploadConfig;
   database: DatabaseConfig;
+  storage: StorageConfig;
   telegram: TelegramConfig;
   log: LogConfig;
   accounts: AccountMapping[];

@@ -35,6 +35,30 @@ async function bootstrap(): Promise<void> {
   ensureDir('./tmp');
   ensureDir('./public/cover');
 
+  // 2.5. Verify storage service health
+  if (config.storage.provider === 'r2') {
+    const { getStorageService, setStorageHealthy } = await import('./services/storage');
+    const storageService = getStorageService();
+    try {
+      const isHealthy = await storageService.healthCheck();
+      if (!isHealthy) {
+        logger.warn('R2 Storage healthCheck failed at startup. Marking storage unavailable.');
+        setStorageHealthy(false);
+      } else {
+        logger.info('R2 Storage healthCheck passed.');
+        setStorageHealthy(true);
+      }
+    } catch (err) {
+      logger.error(
+        'R2 Storage healthCheck threw an error at startup. Marking storage unavailable.',
+        {
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
+      setStorageHealthy(false);
+    }
+  }
+
   // 3. Recover stuck jobs from previous run
   try {
     // REQ-8: Reset any jobs that were stuck in-flight when server last crashed

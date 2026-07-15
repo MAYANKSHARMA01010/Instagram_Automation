@@ -45,6 +45,17 @@ export function validateConfig(): void {
       );
     }
   }
+
+  // Validate R2 config if enabled
+  if (process.env.STORAGE_PROVIDER === 'r2') {
+    const r2Vars = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME'];
+    const missingR2 = r2Vars.filter((key) => !process.env[key]);
+    if (missingR2.length > 0) {
+      throw new Error(
+        `Missing required environment variables for R2 storage:\n${missingR2.map((k) => `  - ${k}`).join('\n')}`,
+      );
+    }
+  }
 }
 
 function parseAccountsConfig(): AccountMapping[] {
@@ -125,6 +136,18 @@ export function loadConfig(): Config {
     },
     database: {
       databaseUrl: process.env.DATABASE_URL,
+    },
+    storage: {
+      provider: process.env.STORAGE_PROVIDER === 'r2' ? 'r2' : 'local',
+      r2:
+        process.env.STORAGE_PROVIDER === 'r2'
+          ? {
+              accountId: process.env.R2_ACCOUNT_ID ?? '',
+              accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
+              secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+              bucketName: process.env.R2_BUCKET_NAME ?? '',
+            }
+          : undefined,
     },
     telegram: {
       botToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
